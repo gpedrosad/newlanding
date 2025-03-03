@@ -53,26 +53,12 @@ const Profile: React.FC = () => {
     specializations: ["Terapia Cognitiva", "Mindfulness", "Terapia de Pareja"],
     photo: "/yo.png", // Asegúrate de tener esta imagen o ajusta la ruta
     services: [
-      {
-        id: "service1",
-        name: "Consulta Inicial",
-        price_ars: 1500,
-        duration: 60,
-        selected_slots: {
-          Lunes: ["09:00 - 10:00", "14:00 - 15:00"],
-          Martes: ["10:00 - 11:00"],
-          Miércoles: ["15:00 - 16:00"],
-          Jueves: [],
-          Viernes: ["09:00 - 10:00"],
-          Sábado: [],
-          Domingo: [],
-        },
-      },
+      
       {
         id: "service2",
-        name: "Terapia de Seguimiento",
-        price_ars: 1200,
-        duration: 45,
+        name: "Sesión Psicológica",
+        price_ars: 30000,
+        duration: 50,
         selected_slots: {
           Lunes: ["11:00 - 11:45"],
           Martes: ["12:00 - 12:45"],
@@ -204,7 +190,7 @@ const Profile: React.FC = () => {
                 <h4 className="text-xl font-bold">{service.name}</h4>
                 <p className="text-gray-600">
                   {service.duration} min |{" "}
-                  {service.price_ars?.toLocaleString()} ARS
+                  {service.price_ars?.toLocaleString()} CLP
                 </p>
                 <p className="mt-2 text-gray-700">
                   Horarios disponibles:{" "}
@@ -223,7 +209,7 @@ const Profile: React.FC = () => {
 
       {/* Footer hardcodeado */}
       <div className="w-full bg-white p-6 text-center text-gray-600">
-        <p>© 2025 Mi Perfil. Todos los derechos reservados.</p>
+        <p>© 2025 Ansiosamente. Todos los derechos reservados.</p>
       </div>
     </div>
   );
