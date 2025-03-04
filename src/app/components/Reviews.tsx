@@ -16,6 +16,70 @@ const Reviews: React.FC = () => {
   // Se utiliza la data proveniente del otro componente, transformada al formato esperado
   const reviews: Review[] = [
     {
+      id: "14",
+      review_date: "2025-04-15T11:30:00Z",
+      review_description:
+        "Me sentí muy cómoda con las sesiones me ayudó a superar y cambiar muchas cosas, recomiendo mucho este servicio ",
+      review_stars: 5,
+      user_full_name: "Sofia Hernandez",
+    },
+    {
+      id: "13",
+      review_date: "2025-04-10T10:45:00Z",
+      review_description:
+        "Un Excelente profesional Gonzalo preocupado de sus paciente en todo momento ",
+      review_stars: 5,
+      user_full_name: "Yocelyn",
+    },
+    {
+      id: "12",
+      review_date: "2025-04-05T09:30:00Z",
+      review_description:
+        "Gonzalo atiende a mi hijo adolecente hace varios meses, por transtorno de ansiedad y deficit atencional. Mi hijo está muy contento con sus sesiones. Lo recomiendo 100%. Es responsable, puntual y muy comprometido con su paciente. A mi hijo le da mucha confianza conversar con él. Es un 7. El está mucho mejor y yo muy contenta.",
+      review_stars: 5,
+      user_full_name: "Claudia",
+    },
+    {
+      id: "11",
+      review_date: "2025-03-30T11:00:00Z",
+      review_description:
+        " Conoci a Gonzalo en un momento de mucho conflicto interno, y el con su alto grado de compromiso y capacidad de escucha, fue capaz de ayudarme a ver de manera distinta lo que estaba viviendo, haciendo muy grata cada sesión .. es una persona agradable y un excelente profesional.\nLo recomiendo al 100%",
+      review_stars: 5,
+      user_full_name: "Karen",
+    },
+    {
+      id: "10",
+      review_date: "2025-03-25T10:15:00Z",
+      review_description:
+        "Gonzalo es un excelente profesional, acudí a el cuando mi vida era un caos, había tocado fondo y creí que de ahí no saldría, me aconsejo, me ayudó y estuvo para mí sin importar horarios ni dinero, abrió mi mente y me hizo ver la vida de una manera distinta y sin lugar a dudas su terapia fue uno de los pilares fundamentales para poder salir de ahí.\nAgradezco mucho encontrarlo y obviamente recomendaría su servicio. ",
+      review_stars: 5,
+      user_full_name: "Valeska Bravo Montecinos",
+    },
+    {
+      id: "9",
+      review_date: "2025-03-20T13:45:00Z",
+      review_description:
+        "Muy buen profesional. Empático. Lo recomiendo",
+      review_stars: 5,
+      user_full_name: "Emiliana Vera",
+    },
+    {
+      id: "8",
+      review_date: "2025-03-15T16:30:00Z",
+      review_description:
+        "En lo personal siento que Gonzalo fue de gran ayuda en mi búsqueda como persona, para encontrar mi paz mental y darme cuenta del valor que tengo solo por ser persona, además tenía instaurada una forma muy agresiva de mi ser y el busca a través de la contra pregunta ver las cosas desde otro punto de vista, dando a conocer tus potencial y no victimizándote. En resumen las terapias con el me ayudaron a:\n*Establecer límites y reconocer personas manipuladoras\n* valorar quién soy como mujer\n* tomar control de mi vida y de aquellos que están a mi cargo\n* poder ver las cosas de varios puntos de vista y no uno solo.\nEn conclusión hoy puedo disfrutar más consciente de la vida, valorándome como persona, estableciendo límites, saber donde quiero estar y estar con la persona que me quiera, además de potenciar mi fuerza para salir de relaciones tóxicas. 👍",
+      review_stars: 5,
+      user_full_name: "Evelyn",
+    },
+    {
+      id: "7",
+      review_date: "2025-03-10T14:00:00Z",
+      review_description:
+        "Exelente profecional me encanto compartir mi vida con el me ayudo mucho!!",
+      review_stars: 5,
+      user_full_name: "Daniela Quevedo",
+    },
+    {
       id: "1",
       review_date: "2025-03-01T10:00:00Z",
       review_description:
@@ -92,7 +156,7 @@ const Reviews: React.FC = () => {
             {renderStars(parseFloat(averageRating))}
           </div>
           <p className="text-gray-500 text-md mt-2">
-            Basado en {reviews.length} evaluaciones
+            Basado en 281 evaluaciones
           </p>
         </div>
       </div>

@@ -50,7 +50,7 @@ const Profile: React.FC = () => {
     profession: "Psicólogo Clínico",
     professionalDescription:
       "Con más de 15 años de experiencia ayudando a pacientes a encontrar el equilibrio emocional, ofrezco un enfoque integrador basado en evidencia y técnicas modernas de psicoterapia.",
-    specializations: ["Terapia Cognitiva", "Mindfulness", "Terapia de Pareja"],
+    specializations: ["Terapia Cognitiva", "Mindfulness", "Depresión", "Ansiedad", "Estrés", "Autoestima"],
     photo: "/yo.png", // Asegúrate de tener esta imagen o ajusta la ruta
     services: [
       
@@ -74,8 +74,8 @@ const Profile: React.FC = () => {
   };
 
   // Datos de reseñas hardcodeados
-  const averageRating = 4.2;
-  const reviewCount = 25;
+  const averageRating = 4.8;
+  const reviewCount = 281;
   const isRatingLoading = false;
 
   // Función auxiliar para renderizar estrellas según la puntuación
@@ -185,17 +185,37 @@ const Profile: React.FC = () => {
             profileData.services.map((service) => (
               <div
                 key={service.id}
-                className="p-4 border rounded-lg mb-4 w-full max-w-md"
+                className="p-6 bg-white border-l-4 border-[#023047] rounded-lg mb-6 w-full max-w-md shadow-lg hover:shadow-xl transition-all duration-200"
               >
-                <h4 className="text-xl font-bold">{service.name}</h4>
-                <p className="text-gray-600">
-                  {service.duration} min |{" "}
-                  {service.price_ars?.toLocaleString()} CLP
-                </p>
-                <p className="mt-2 text-gray-700">
-                  Horarios disponibles:{" "}
-                  {service.selected_slots?.Lunes.join(", ") || "No disponibles"}
-                </p>
+                <div className="flex flex-col space-y-4">
+                  <h4 className="text-xl font-bold text-[#023047]">{service.name}</h4>
+                  
+                  <div className="flex flex-row justify-between items-center bg-gray-50 p-3 rounded-lg">
+                    <div className="flex items-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="font-medium">{service.duration} minutos</span>
+                    </div>
+                    
+                    <div className="flex items-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="font-bold text-lg text-[#023047]">{service.price_ars?.toLocaleString()} CLP</span>
+                    </div>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    className="w-full bg-[#023047] text-white font-semibold py-3 px-4 rounded-lg hover:bg-[#03506f] active:transform active:scale-98 transition-all duration-200 flex justify-center items-center space-x-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span>Agendar cita</span>
+                  </button>
+                </div>
               </div>
             ))
           ) : (
