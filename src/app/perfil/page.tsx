@@ -1,5 +1,4 @@
 "use client";
-
 import React from "react";
 import Image from "next/image";
 import { AiFillStar, AiOutlineStar, AiOutlineCheckCircle } from "react-icons/ai";
@@ -31,6 +30,12 @@ interface ProfileData {
   professional_id: string | null;
 }
 
+declare global {
+  interface Window {
+    fbq?: (command: string, eventName: string, params?: object) => void;
+  }
+}
+
 const Profile: React.FC = () => {
   // Mover los datos estáticos fuera del componente
   const [mounted, setMounted] = React.useState(false);
@@ -39,7 +44,6 @@ const Profile: React.FC = () => {
     setMounted(true);
   }, []);
 
-  // Si no está montado, renderizar un esqueleto o nada
   if (!mounted) {
     return null; // o return un componente de carga
   }
@@ -49,11 +53,10 @@ const Profile: React.FC = () => {
     name: "Gonzalo Pedrosa",
     profession: "Psicólogo Clínico",
     professionalDescription:
-      "Con más de 15 años de experiencia ayudando a pacientes a encontrar el equilibrio emocional, ofrezco un enfoque integrador basado en evidencia y técnicas modernas de psicoterapia.",
+      "Con más de 7 años de experiencia ayudando a pacientes a encontrar el equilibrio emocional, ofrezco un enfoque integrador basado en evidencia y técnicas modernas de psicoterapia.",
     specializations: ["Terapia Cognitiva", "Mindfulness", "Depresión", "Ansiedad", "Estrés", "Autoestima"],
     photo: "/yo.png", // Asegúrate de tener esta imagen o ajusta la ruta
     services: [
-      
       {
         id: "service2",
         name: "Sesión Psicológica",
@@ -92,6 +95,16 @@ const Profile: React.FC = () => {
         )}
       </div>
     );
+  };
+
+  // Función para manejar el click en "Agendar cita"
+  const handleAgendarClick = () => {
+    // Disparar evento en Facebook Pixel
+    if (window.fbq) {
+      window.fbq("track", "AgendamientoWhatsapp");
+    }
+    // Redireccionar a la URL de WhatsApp
+    window.location.href = "https://walink.co/6626d8";
   };
 
   return (
@@ -202,18 +215,21 @@ const Profile: React.FC = () => {
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <span className="font-bold text-lg text-[#023047]">{service.price_ars?.toLocaleString()} CLP</span>
+                      <span className="font-bold text-lg text-[#023047]">
+                        {service.price_ars?.toLocaleString()} CLP
+                      </span>
                     </div>
                   </div>
                   
                   <button
                     type="button"
+                    onClick={handleAgendarClick}
                     className="w-full bg-[#023047] text-white font-semibold py-3 px-4 rounded-lg hover:bg-[#03506f] active:transform active:scale-98 transition-all duration-200 flex justify-center items-center space-x-2"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    <span>Agendar cita</span>
+                    <span>Agendar sesión</span>
                   </button>
                 </div>
               </div>
