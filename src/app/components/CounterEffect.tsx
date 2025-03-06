@@ -44,7 +44,7 @@ const CounterEffect = () => {
     <section className="bg-gray-100 py-10">
       <div className="max-w-5xl mx-auto px-4">
         <h2 className="text-3xl md:text-5xl font-bold text-center text-gray-800 mb-4">
-          Titulo
+          Sesiones agendadas
         </h2>
         <p className="text-center text-gray-600 mb-12">
           Descripción
@@ -68,7 +68,7 @@ const CounterEffect = () => {
             </div>
             <div className="text-lg md:text-xl font-semibold flex items-center justify-center space-x-2">
               <span role="img" aria-label="personas">👥</span>
-              <span>Personas iniciando su camino</span>
+              <span>Pacientes</span>
             </div>
           </div>
         </div>
