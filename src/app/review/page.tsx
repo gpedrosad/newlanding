@@ -41,7 +41,7 @@ const ReviewPage = () => {
     <div className="flex flex-col items-center py-10 bg-gray-50">
       <div className="mb-6">
         <img
-          src="/images/yoo.jpg"
+          src="/yo.png"
           alt="Foto de perfil"
           className="rounded-full w-48 h-48 object-cover shadow-lg"
         />
