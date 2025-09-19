@@ -4,6 +4,8 @@ import React, { useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import ThreeSessionEvaluation from "@/app/components/ThreeSessionEvaluation";
+import StickyHeader from "./_components/StickyHeader";
+import ScoreCard from "./_components/ScoreCard";
 
 /* ===========================
    Página con Suspense wrapper
@@ -22,16 +24,10 @@ export default function ResultPage() {
 function ResultFallback() {
   return (
     <div className="min-h-svh w-full bg-white">
-      <header className="sticky top-0 z-10 border-b border-gray-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3 md:px-6">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex h-2 w-2 rounded-full bg-black" />
-            <span className="h-4 w-28 animate-pulse rounded bg-gray-200" />
-          </div>
-          <span className="h-3 w-24 animate-pulse rounded bg-gray-200" />
-        </div>
-      </header>
-
+      <StickyHeader
+        title="TDAH · Resultado"
+        right={<span className="h-3 w-24 animate-pulse rounded bg-gray-200 inline-block" />}
+      />
       <main className="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-12">
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6 md:p-10">
           <div className="grid gap-6 md:grid-cols-2 md:items-start">
@@ -189,14 +185,7 @@ function ResultInner() {
   if (!parsed) {
     return (
       <div className="min-h-svh w-full bg-white">
-        <header className="sticky top-0 z-10 border-b border-gray-200 bg-white/90 backdrop-blur">
-          <div className="mx-auto flex max-w-screen-sm items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex h-2 w-2 rounded-full bg-black" />
-              <span className="text-sm font-semibold text-gray-900">TDAH · Resultado</span>
-            </div>
-          </div>
-        </header>
+        <StickyHeader title="TDAH · Resultado" />
         <main className="mx-auto max-w-screen-sm px-4 py-10">
           <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <h1 className="text-lg font-semibold text-gray-900">No hay datos para mostrar</h1>
@@ -235,16 +224,7 @@ function ResultInner() {
 
   return (
     <div className="min-h-svh w-full bg-white">
-      {/* Header */}
-      <header className="sticky top-0 z-10 border-b border-gray-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3 md:px-6">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex h-2 w-2 rounded-full bg-black" />
-            <span className="text-sm font-semibold text-gray-900">TDAH · Resultado</span>
-          </div>
-          <span className="text-xs text-gray-500">Ítems: {n}</span>
-        </div>
-      </header>
+      <StickyHeader title="TDAH · Resultado" right={`Ítems: ${n}`} />
 
       {/* Content */}
       <main className="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-12">
@@ -254,38 +234,24 @@ function ResultInner() {
           transition={{ duration: 0.28 }}
           className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6 md:p-10"
         >
-          {/* Resumen superior */}
+          {/* Resumen superior usando ScoreCard */}
           <div className="grid gap-6 md:grid-cols-2 md:items-start">
-            {/* Total */}
-            <div className="space-y-3">
-              <h2 className="text-sm font-semibold text-gray-900">Puntaje total (0–{n * 4})</h2>
-              <div className="text-4xl font-bold tracking-tight text-gray-900">
-                {total.toFixed(0)} <span className="text-gray-400 text-2xl align-top">/ {n * 4}</span>
-              </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${pct}%` }}
-                  transition={{ duration: 0.5 }}
-                  className="h-2 rounded-full bg-black"
-                  aria-label="Porcentaje"
-                />
-              </div>
-              <div className="text-xs text-gray-500">{pct}% del máximo posible</div>
-            </div>
+            <ScoreCard
+              title={`Puntaje total (0–${n * 4})`}
+              value={total.toFixed(0)}
+              suffix={` / ${n * 4}`}
+              progressPct={pct}
+              progressLabel={`${pct}% del máximo posible`}
+            />
 
-            {/* Promedio + banda */}
-            <div className="space-y-3">
-              <h2 className="text-sm font-semibold text-gray-900">Promedio (0–4) y referencia</h2>
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="text-3xl font-bold text-gray-900">
-                  {avg.toFixed(2)} <span className="text-gray-400 text-xl align-top">/ 4</span>
-                </div>
-                <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm ${band.badge}`}>
-                  {band.label}
-                </span>
-              </div>
-              {/* Guía de interpretación (total) */}
+            <ScoreCard
+              title="Promedio (0–4) y referencia"
+              value={avg.toFixed(2)}
+              suffix=" / 4"
+              badgeText={band.label}
+              badgeClass={band.badge}
+            >
+              {/* Guía debajo del segundo card */}
               <div className="rounded-lg border border-gray-200 p-3 text-sm text-gray-700">
                 <div className="mb-1 text-xs font-semibold text-gray-900">Guía de interpretación (total 0–40):</div>
                 <ul className="grid gap-1">
@@ -296,7 +262,7 @@ function ResultInner() {
                   <li>35–40: Muy alto</li>
                 </ul>
               </div>
-            </div>
+            </ScoreCard>
           </div>
 
           {/* Probabilidad de diagnóstico */}
@@ -306,18 +272,17 @@ function ResultInner() {
               <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm ${prob.badge}`}>
                 {prob.label}
               </span>
-              <span className="text-sm text-gray-500">Estimación basada en tus respuestas (no constituye diagnóstico)</span>
+              <span className="text-sm text-gray-500">
+                Estimación basada en tus respuestas (no constituye diagnóstico)
+              </span>
             </div>
             <p className="text-sm text-gray-700">{prob.text}</p>
           </section>
 
-          {/* Componente reutilizable: Evaluación de 3 sesiones */}
-          <div className="mt-8">
+          {/* Evaluación 3 sesiones */}
+          <div className="mt-12 md:mt-16 pt-8 md:pt-10 border-t border-gray-200">
             <ThreeSessionEvaluation
               price={PRICE}
-              // locale="es-AR"     // si querés formato local
-              // currency="ARS"     // + estilo de moneda real:
-              // useCurrencyStyle   // descomenta para usar Intl con moneda
               onReserve={handleReserve}
               onDetails={handleDetails}
               scoreContext={{
