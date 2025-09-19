@@ -1,11 +1,59 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 
-/* Rango de referencia para 10 ítems (máximo 40).
-   Puedes ajustar los tramos si lo deseas. */
+/* ---------- Wrapper con Suspense (requerido por useSearchParams) ---------- */
+export default function ResultPage() {
+  return (
+    <Suspense fallback={<ResultFallback />}>
+      <ResultInner />
+    </Suspense>
+  );
+}
+
+/* ---------- Fallback esquelético mientras hidrata en cliente ---------- */
+function ResultFallback() {
+  return (
+    <div className="min-h-svh w-full bg-white">
+      <header className="sticky top-0 z-10 border-b border-gray-200 bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3 md:px-6">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-2 w-2 rounded-full bg-black" />
+            <span className="h-4 w-28 animate-pulse rounded bg-gray-200" />
+          </div>
+          <span className="h-3 w-24 animate-pulse rounded bg-gray-200" />
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-12">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6 md:p-10">
+          <div className="grid gap-6 md:grid-cols-2 md:items-start">
+            <div className="space-y-3">
+              <div className="h-4 w-48 animate-pulse rounded bg-gray-200" />
+              <div className="h-10 w-40 animate-pulse rounded bg-gray-200" />
+              <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                <div className="h-2 w-1/3 animate-pulse rounded-full bg-gray-300" />
+              </div>
+              <div className="h-3 w-28 animate-pulse rounded bg-gray-200" />
+            </div>
+            <div className="space-y-3">
+              <div className="h-4 w-56 animate-pulse rounded bg-gray-200" />
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-28 animate-pulse rounded bg-gray-200" />
+                <div className="h-6 w-24 animate-pulse rounded bg-gray-200" />
+              </div>
+              <div className="h-24 w-full animate-pulse rounded-lg border border-gray-200 bg-gray-50" />
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+/* ---------- Utils ---------- */
 function rangeLabel(total: number) {
   if (total >= 35) return { label: "Muy alto", badge: "bg-black text-white" };
   if (total >= 30) return { label: "Alto", badge: "bg-gray-900 text-white" };
@@ -19,13 +67,14 @@ const btnBlack =
   "hover:bg-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 " +
   "disabled:opacity-50 disabled:pointer-events-none";
 
-export default function ResultPage() {
+/* ---------- Contenido real (usa useSearchParams) ---------- */
+function ResultInner() {
   const router = useRouter();
   const sp = useSearchParams();
 
   const n = useMemo(() => {
     const v = Number(sp.get("n"));
-    return Number.isFinite(v) && v > 0 ? v : 0; // debería ser 10
+    return Number.isFinite(v) && v > 0 ? v : 0; // esperado: 10
   }, [sp]);
 
   // Parser flexible: acepta total/avg/score
@@ -54,7 +103,7 @@ export default function ResultPage() {
       return null;
     }
 
-    // Capamos a los límites esperados
+    // Normalizamos a los límites esperados
     const cappedAvg = Math.max(0, Math.min(4, avg));
     const cappedTotal = Math.max(0, Math.min(n * 4, total));
     const pct = Math.round((cappedTotal / (n * 4)) * 100);
@@ -69,9 +118,18 @@ export default function ResultPage() {
   async function handleShare() {
     const url = typeof window !== "undefined" ? window.location.href : "";
     if (navigator.share) {
-      try { await navigator.share({ title: "Resultado TDAH", text: "Mi resultado del test.", url }); } catch {}
+      try {
+        await navigator.share({ title: "Resultado TDAH", text: "Mi resultado del test.", url });
+      } catch {
+        // usuario canceló
+      }
     } else {
-      try { await navigator.clipboard.writeText(url); alert("Enlace copiado"); } catch { alert("No se pudo copiar el enlace."); }
+      try {
+        await navigator.clipboard.writeText(url);
+        alert("Enlace copiado");
+      } catch {
+        alert("No se pudo copiar el enlace.");
+      }
     }
   }
 
@@ -156,7 +214,7 @@ export default function ResultPage() {
               </div>
               {/* Tabla de referencia para 10 ítems */}
               <div className="rounded-lg border border-gray-200 p-3 text-sm text-gray-700">
-                <div className="text-xs font-semibold text-gray-900 mb-1">Referencia (total 0–40):</div>
+                <div className="mb-1 text-xs font-semibold text-gray-900">Referencia (total 0–40):</div>
                 <ul className="grid gap-1">
                   <li>0–9: Muy bajo</li>
                   <li>10–19: Bajo</li>
