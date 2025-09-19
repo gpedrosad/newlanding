@@ -3,8 +3,11 @@
 import React, { useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
+import ThreeSessionEvaluation from "@/app/components/ThreeSessionEvaluation";
 
-/* ---------- Wrapper con Suspense (requerido por useSearchParams) ---------- */
+/* ===========================
+   Página con Suspense wrapper
+   =========================== */
 export default function ResultPage() {
   return (
     <Suspense fallback={<ResultFallback />}>
@@ -13,7 +16,9 @@ export default function ResultPage() {
   );
 }
 
-/* ---------- Fallback esquelético mientras hidrata en cliente ---------- */
+/* ================
+   Skeleton fallback
+   ================ */
 function ResultFallback() {
   return (
     <div className="min-h-svh w-full bg-white">
@@ -53,7 +58,9 @@ function ResultFallback() {
   );
 }
 
-/* ---------- Utils ---------- */
+/* =================
+   Utils y constantes
+   ================= */
 function rangeLabel(total: number) {
   if (total >= 35) return { label: "Muy alto", badge: "bg-black text-white" };
   if (total >= 30) return { label: "Alto", badge: "bg-gray-900 text-white" };
@@ -62,12 +69,62 @@ function rangeLabel(total: number) {
   return { label: "Muy bajo", badge: "bg-gray-300 text-gray-900" };
 }
 
+/** Mapea el total (0–40) a una categoría de probabilidad de diagnóstico + texto guía */
+function probabilityCategory(total: number) {
+  if (total >= 35) {
+    return {
+      label: "Probabilidad muy alta",
+      badge: "bg-black text-white",
+      text:
+        "Tu patrón de respuestas sugiere una probabilidad muy alta de un cuadro compatible con TDAH. " +
+        "Es muy recomendable realizar una evaluación clínica completa para confirmar el diagnóstico, " +
+        "explorar condiciones asociadas y diseñar un plan de tratamiento."
+    };
+  }
+  if (total >= 30) {
+    return {
+      label: "Probabilidad alta",
+      badge: "bg-gray-900 text-white",
+      text:
+        "Existe una probabilidad alta de TDAH. Te conviene agendar una evaluación integral para precisar el diagnóstico " +
+        "y definir estrategias de intervención personalizadas."
+    };
+  }
+  if (total >= 20) {
+    return {
+      label: "Probabilidad moderada",
+      badge: "bg-gray-700 text-white",
+      text:
+        "Tus respuestas indican probabilidad moderada. Puede haber manifestaciones de inatención y/o impulsividad. " +
+        "Una evaluación clínica ayudará a aclarar el cuadro y a priorizar medidas prácticas."
+    };
+  }
+  if (total >= 10) {
+    return {
+      label: "Probabilidad baja",
+      badge: "bg-gray-500 text-white",
+      text:
+        "La probabilidad estimada es baja. Aun así, si notas impacto en estudio, trabajo o relaciones, " +
+        "una consulta profesional puede orientar estrategias de manejo."
+    };
+  }
+  return {
+    label: "Probabilidad muy baja",
+    badge: "bg-gray-300 text-gray-900",
+    text:
+      "La probabilidad estimada es muy baja. Si persisten dudas o hay dificultades significativas, " +
+      "una evaluación clínica puede descartar otras causas y brindar recomendaciones."
+  };
+}
+
 const btnBlack =
   "rounded-lg bg-black text-white px-4 py-3 text-base sm:text-sm font-semibold shadow-sm transition " +
   "hover:bg-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 " +
   "disabled:opacity-50 disabled:pointer-events-none";
 
-/* ---------- Contenido real (usa useSearchParams) ---------- */
+/* ==========================
+   Contenido real de la página
+   ========================== */
 function ResultInner() {
   const router = useRouter();
   const sp = useSearchParams();
@@ -86,7 +143,6 @@ function ResultInner() {
     let total: number | null = Number.isFinite(totalParam) ? totalParam : null;
     let avg: number | null = Number.isFinite(avgParam) ? avgParam : null;
 
-    // Si llega solo "score", interpretamos: <=4 como promedio; >4 como total.
     if ((total == null || !Number.isFinite(total)) && Number.isFinite(scoreParam)) {
       if (scoreParam > 4.000001) total = scoreParam;
       else avg = scoreParam;
@@ -103,7 +159,6 @@ function ResultInner() {
       return null;
     }
 
-    // Normalizamos a los límites esperados
     const cappedAvg = Math.max(0, Math.min(4, avg));
     const cappedTotal = Math.max(0, Math.min(n * 4, total));
     const pct = Math.round((cappedTotal / (n * 4)) * 100);
@@ -120,9 +175,7 @@ function ResultInner() {
     if (navigator.share) {
       try {
         await navigator.share({ title: "Resultado TDAH", text: "Mi resultado del test.", url });
-      } catch {
-        // usuario canceló
-      }
+      } catch {}
     } else {
       try {
         await navigator.clipboard.writeText(url);
@@ -159,6 +212,26 @@ function ResultInner() {
 
   const { avg, total, pct } = parsed;
   const band = rangeLabel(total);
+  const prob = probabilityCategory(total);
+
+  // ---- Handlers para el componente de Evaluación ----
+  const PRICE = 150_000;
+
+  const handleReserve = () => {
+    const qp = new URLSearchParams({
+      plan: "evaluacion-3-sesiones",
+      precio: String(PRICE),
+      total: total.toFixed(0),
+      avg: avg.toFixed(2),
+      n: String(n),
+      prob: prob.label,
+    }).toString();
+    router.push(`/agenda?${qp}`); // ajusta a tu ruta real
+  };
+
+  const handleDetails = () => {
+    router.push("/servicios/evaluacion"); // ajusta a tu ruta real
+  };
 
   return (
     <div className="min-h-svh w-full bg-white">
@@ -212,9 +285,9 @@ function ResultInner() {
                   {band.label}
                 </span>
               </div>
-              {/* Tabla de referencia para 10 ítems */}
+              {/* Guía de interpretación (total) */}
               <div className="rounded-lg border border-gray-200 p-3 text-sm text-gray-700">
-                <div className="mb-1 text-xs font-semibold text-gray-900">Referencia (total 0–40):</div>
+                <div className="mb-1 text-xs font-semibold text-gray-900">Guía de interpretación (total 0–40):</div>
                 <ul className="grid gap-1">
                   <li>0–9: Muy bajo</li>
                   <li>10–19: Bajo</li>
@@ -226,7 +299,37 @@ function ResultInner() {
             </div>
           </div>
 
-          {/* Acciones */}
+          {/* Probabilidad de diagnóstico */}
+          <section className="mt-8 grid gap-3">
+            <h3 className="text-base font-semibold text-gray-900">Probabilidad de diagnóstico</h3>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm ${prob.badge}`}>
+                {prob.label}
+              </span>
+              <span className="text-sm text-gray-500">Estimación basada en tus respuestas (no constituye diagnóstico)</span>
+            </div>
+            <p className="text-sm text-gray-700">{prob.text}</p>
+          </section>
+
+          {/* Componente reutilizable: Evaluación de 3 sesiones */}
+          <div className="mt-8">
+            <ThreeSessionEvaluation
+              price={PRICE}
+              // locale="es-AR"     // si querés formato local
+              // currency="ARS"     // + estilo de moneda real:
+              // useCurrencyStyle   // descomenta para usar Intl con moneda
+              onReserve={handleReserve}
+              onDetails={handleDetails}
+              scoreContext={{
+                total,
+                avg,
+                n,
+                probabilityLabel: prob.label,
+              }}
+            />
+          </div>
+
+          {/* Acciones base */}
           <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
             <button onClick={handleRetake} className={btnBlack}>Rehacer test</button>
             <button onClick={handleShare} className={btnBlack}>Compartir resultado</button>
