@@ -4,6 +4,7 @@ import React, { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { User, Mail, Phone } from "lucide-react";
+import HeroBandit from "@/app/test/_components/HeroBandit";
 
 /* =================== Tipos =================== */
 interface FormData {
@@ -89,7 +90,18 @@ export default function Page() {
 
       {/* Contenido */}
       <main className="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-12">
+        {/* HERO con bandit */}
+        <HeroBandit
+          slug="hero-tdah"
+          onPrimary={() => {
+            const el = document.getElementById("form-start");
+            if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
+          className="mb-8"
+        />
+
         <motion.div
+          id="form-start"
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.28 }}
@@ -175,9 +187,7 @@ export default function Page() {
                   aria-invalid={!!errors.phone}
                 />
               </div>
-              <p className="text-xs text-gray-500">
-                Usa tu número con código de país (ej. +56, +54).
-              </p>
+              <p className="text-xs text-gray-500">Usa tu número con código de país (ej. +56, +54).</p>
               {errors.phone && <p className="text-sm text-rose-600">{errors.phone}</p>}
             </div>
 
@@ -203,11 +213,7 @@ export default function Page() {
 
             {/* Acciones */}
             <div className="mt-2 flex flex-col gap-3">
-              <button
-                type="submit"
-                disabled={submitting || !isValid}
-                className={btnBlack}
-              >
+              <button type="submit" disabled={submitting || !isValid} className={btnBlack}>
                 {submitting ? "Procesando…" : "Empezar test"}
               </button>
               <div className="flex items-center gap-3 text-xs text-gray-500">
