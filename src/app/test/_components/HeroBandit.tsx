@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Check, Shield, Clock } from "lucide-react";
+import HeroStats from "./HeroStats";
 
 type Variant = "A" | "B" | "control";
 type GetVariantResponse = { variant: Variant; anon_id?: string; disabled?: boolean };
@@ -288,16 +289,8 @@ export default function HeroBandit({ slug = "hero-tdah", onPrimary, className = 
             </div>
           </div>
 
-          <div className="order-first -mx-2 md:order-none md:mx-0">
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="rounded-xl bg-gray-50 p-3"><p className="text-2xl font-semibold text-gray-900">4–6</p><p className="text-xs text-gray-500">minutos</p></div>
-                <div className="rounded-xl bg-gray-50 p-3"><p className="text-2xl font-semibold text-gray-900">100%</p><p className="text-xs text-gray-500">online</p></div>
-                <div className="rounded-xl bg-gray-50 p-3"><p className="text-2xl font-semibold text-gray-900">✓</p><p className="text-xs text-gray-500">orientativo</p></div>
-              </div>
-            </div>
-            <p className="mt-3 text-center text-xs text-gray-500">Este test no reemplaza una evaluación clínica completa.</p>
-          </div>
+          
+        <HeroStats />
         </motion.div>
       </div>
     </section>

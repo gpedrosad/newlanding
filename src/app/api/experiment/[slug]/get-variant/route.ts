@@ -1,6 +1,6 @@
 // src/app/api/experiment/[slug]/get-variant/route.ts
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+// import { cookies } from "next/headers"; // PRUEBAS: no usar cookie anon_id por ahora
 import { supabaseAdmin } from "../../../../lib/supabaseAdmin"; // NO lo importes en cliente
 
 /* --- Thompson Sampling helpers (igual que antes) --- */
@@ -40,19 +40,20 @@ export async function GET(
 ) {
   const slug = decodeURIComponent(params.slug);
 
-  // 👇 Ahora es asíncrono
-  const jar = await cookies();
-  let anon = jar.get("anon_id")?.value;
-  if (!anon) {
-    anon = crypto.randomUUID();
-    jar.set("anon_id", anon, {
-      path: "/",
-      maxAge: 60 * 60 * 24 * 90,
-      sameSite: "lax",
-      secure: true,
-      httpOnly: true,
-    });
-  }
+  // PRUEBAS: generar anon por request, sin persistir cookie
+  // const jar = await cookies();
+  // let anon = jar.get("anon_id")?.value;
+  // if (!anon) {
+  //   anon = crypto.randomUUID();
+  //   jar.set("anon_id", anon, {
+  //     path: "/",
+  //     maxAge: 60 * 60 * 24 * 90,
+  //     sameSite: "lax",
+  //     secure: true,
+  //     httpOnly: true,
+  //   });
+  // }
+  const anon = crypto.randomUUID();
 
   const { data: exp } = await supabaseAdmin
     .from("experiments")
@@ -64,17 +65,17 @@ export async function GET(
     return NextResponse.json({ variant: "control", disabled: true, anon_id: anon });
   }
 
-  const { data: prev } = await supabaseAdmin
-    .from("experiment_assignments")
-    .select("variant_id, experiment_variants(name)")
-    .eq("experiment_id", exp.id)
-    .eq("anon_id", anon)
-    .limit(1);
-
-  if (prev && prev.length > 0) {
-    const vname = (prev[0] as any).experiment_variants.name as string;
-    return NextResponse.json({ variant: vname, anon_id: anon });
-  }
+  // PRUEBAS: no reutilizar asignación previa mientras no usamos cookie
+  // const { data: prev } = await supabaseAdmin
+  //   .from("experiment_assignments")
+  //   .select("variant_id, experiment_variants(name)")
+  //   .eq("experiment_id", exp.id)
+  //   .eq("anon_id", anon)
+  //   .limit(1);
+  // if (prev && prev.length > 0) {
+  //   const vname = (prev[0] as any).experiment_variants.name as string;
+  //   return NextResponse.json({ variant: vname, anon_id: anon });
+  // }
 
   const { data: variants } = await supabaseAdmin
     .from("experiment_variants")
