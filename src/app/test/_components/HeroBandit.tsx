@@ -6,40 +6,24 @@ import { motion } from "framer-motion";
 import { Check, Shield, Clock } from "lucide-react";
 
 type Variant = "A" | "B" | "control";
+type GetVariantResponse = { variant: Variant; anon_id?: string; disabled?: boolean };
+type StartVisitResponse = { ok: boolean; visit_id?: string; error?: string };
 
-type GetVariantResponse = {
-  variant: Variant;
-  anon_id?: string;
-  disabled?: boolean;
-};
+type Props = { slug?: string; onPrimary?: () => void; className?: string };
 
-type StartVisitResponse = {
-  ok: boolean;
-  visit_id?: string;
-  error?: string;
-};
-
-type Props = {
-  slug?: string;        // default: "hero-tdah"
-  onPrimary?: () => void;
-  className?: string;
-};
-
-/** Tipamos la propiedad global que usamos para debug/otros componentes */
-declare global {
-  interface Window {
-    __visit_id?: string;
-  }
-}
+declare global { interface Window { __visit_id?: string } }
 
 export default function HeroBandit({ slug = "hero-tdah", onPrimary, className = "" }: Props) {
   const router = useRouter();
-  const [variant, setVariant] = React.useState<Variant>("A"); // fallback instantáneo
+  const [variant, setVariant] = React.useState<Variant | null>(null); // <- sin fallback visible
   const [anon, setAnon] = React.useState<string | null>(null);
   const [visitId, setVisitId] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
 
-  // 1) Obtener variante (bandit)
+  // Evita /start duplicado (StrictMode/effects)
+  const startedRef = React.useRef(false);
+
+  // ===== 1) Obtener variante (bandit) =====
   React.useEffect(() => {
     let mounted = true;
     (async () => {
@@ -47,20 +31,23 @@ export default function HeroBandit({ slug = "hero-tdah", onPrimary, className = 
         const res = await fetch(`/api/experiment/${encodeURIComponent(slug)}/get-variant`, { cache: "no-store" });
         const d: GetVariantResponse = await res.json();
         if (!mounted) return;
-        if (d.variant) setVariant(d.variant);
-        if (d.anon_id) setAnon(d.anon_id ?? null);
+        setVariant(d.variant);           // ya no hay parpadeo de A->B
+        setAnon(d.anon_id ?? null);
       } catch {
-        /* nos quedamos con A */
+        // si falla, fija un control; pero seguimos evitando flash
+        if (mounted) setVariant("control");
       }
     })();
     return () => { mounted = false; };
   }, [slug]);
 
-  // 2) Iniciar visita (loguea hero_view) y guardar visitId
+  // ===== 2) Iniciar visita (hero_view) → visitId (solo una vez) =====
   React.useEffect(() => {
+    if (!variant || startedRef.current) return;
+    startedRef.current = true;
     let aborted = false;
+
     (async () => {
-      if (!variant) return;
       try {
         const res = await fetch(`/api/experiment/${encodeURIComponent(slug)}/start`, {
           method: "POST",
@@ -70,16 +57,41 @@ export default function HeroBandit({ slug = "hero-tdah", onPrimary, className = 
         const json: StartVisitResponse = await res.json();
         if (!aborted && json?.visit_id) {
           setVisitId(json.visit_id);
-          window.__visit_id = json.visit_id; // ya tipado, sin any
+          window.__visit_id = json.visit_id;
         }
       } catch {
-        /* ignorar */
+        // noop
       }
     })();
+
     return () => { aborted = true; };
   }, [variant, slug]);
 
-  // 3) Log: primer scroll (para bounce)
+  // ===== helper: cerrar visita (Time on Page total) =====
+  const leave = React.useCallback(() => {
+    if (!visitId) return;
+    const url = `/api/experiment/${encodeURIComponent(slug)}/leave`;
+    const payload = JSON.stringify({ visit_id: visitId });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(url, new Blob([payload], { type: "application/json" }));
+    } else {
+      fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: payload, keepalive: true }).catch(() => {});
+    }
+  }, [visitId, slug]);
+
+  // ===== helper: enviar tiempo activo =====
+  const sendActive = React.useCallback((deltaSec: number) => {
+    if (!visitId || deltaSec <= 0) return;
+    const url = `/api/experiment/${encodeURIComponent(slug)}/active`;
+    const payload = JSON.stringify({ visit_id: visitId, deltaSec });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(url, new Blob([payload], { type: "application/json" }));
+    } else {
+      fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: payload, keepalive: true }).catch(() => {});
+    }
+  }, [visitId, slug]);
+
+  // ===== 3) Primer scroll (bounce) =====
   React.useEffect(() => {
     if (!visitId) return;
     let fired = false;
@@ -98,7 +110,7 @@ export default function HeroBandit({ slug = "hero-tdah", onPrimary, className = 
     return () => window.removeEventListener("scroll", onScroll);
   }, [visitId, slug]);
 
-  // 4) Log: form_start (primer focus o keydown)
+  // ===== 4) Form start (primer focus o keydown) =====
   React.useEffect(() => {
     if (!visitId) return;
     let fired = false;
@@ -121,23 +133,72 @@ export default function HeroBandit({ slug = "hero-tdah", onPrimary, className = 
     };
   }, [visitId, slug]);
 
-  // 5) Page leave (duración)
+  // ===== 5) Heartbeat de TIEMPO ACTIVO =====
   React.useEffect(() => {
     if (!visitId) return;
-    const onLeave = () => {
-      const url = `/api/experiment/${encodeURIComponent(slug)}/leave`;
-      const data = JSON.stringify({ visit_id: visitId });
-      navigator.sendBeacon(url, new Blob([data], { type: "application/json" }));
+
+    const lastActivityRef = { current: Date.now() };
+    const markActivity = () => { lastActivityRef.current = Date.now(); };
+
+    const isVisible = () => document.visibilityState === "visible";
+    const isActive = () => Date.now() - lastActivityRef.current < 10_000; // idle si >10s sin actividad
+
+    let hbTimer: number | null = null;
+    const start = () => { if (hbTimer === null) hbTimer = window.setInterval(tick, 5000); };
+    const stop  = () => { if (hbTimer !== null) { clearInterval(hbTimer); hbTimer = null; } };
+
+    const tick = () => { if (isVisible() && isActive()) sendActive(5); };
+
+    const onVis = () => { if (isVisible()) { markActivity(); start(); } else { stop(); } };
+
+    const activityEvents: Array<keyof WindowEventMap> = ["mousemove","scroll","keydown","touchstart","click"];
+    activityEvents.forEach((ev) => window.addEventListener(ev, markActivity as EventListener, { passive: true }));
+    document.addEventListener("visibilitychange", onVis);
+
+    if (isVisible()) start();
+
+    const onLeaveActive = () => { if (isVisible() && isActive()) sendActive(5); };
+    window.addEventListener("pagehide", onLeaveActive);
+    window.addEventListener("beforeunload", onLeaveActive);
+
+    return () => {
+      stop();
+      activityEvents.forEach((ev) => window.removeEventListener(ev, markActivity as EventListener));
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("pagehide", onLeaveActive);
+      window.removeEventListener("beforeunload", onLeaveActive);
     };
+  }, [visitId, sendActive]);
+
+  // ===== 6) Cerrar visita al salir/recargar (ToP) =====
+  React.useEffect(() => {
+    if (!visitId) return;
+    const onLeave = () => leave();
     window.addEventListener("pagehide", onLeave);
     window.addEventListener("beforeunload", onLeave);
     return () => {
       window.removeEventListener("pagehide", onLeave);
       window.removeEventListener("beforeunload", onLeave);
     };
-  }, [visitId, slug]);
+  }, [visitId, leave]);
 
-  // 6) CTA principal
+  // ===== 6b) Interceptar enlaces internos (SPA) =====
+  React.useEffect(() => {
+    if (!visitId) return;
+    const onClick = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      const a = t?.closest?.("a") as HTMLAnchorElement | null;
+      if (!a) return;
+      const href = a.getAttribute("href");
+      const target = a.getAttribute("target");
+      const isInternal = href && href.startsWith("/") && (!target || target === "_self");
+      if (isInternal) leave();
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [visitId, leave]);
+
+  // ===== 7) CTA principal =====
   const handlePrimary = async () => {
     try {
       setLoading(true);
@@ -160,10 +221,35 @@ export default function HeroBandit({ slug = "hero-tdah", onPrimary, className = 
     }
 
     if (onPrimary) { onPrimary(); return; }
-    const el = document.getElementById("form-start");
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-    else router.push("/test/tdah?step=1");
+
+    const form = document.getElementById("form-start");
+    if (form) {
+      form.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      leave();
+      router.push("/test/tdah?step=1");
+    }
   };
+
+  // ===== UI =====
+  // Skeleton mientras resolvemos la variante (evita "flip")
+  if (!variant) {
+    return (
+      <section className={"relative overflow-hidden rounded-3xl border border-gray-200 bg-gradient-to-b from-white to-gray-50 shadow-sm " + className}>
+        <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 md:py-14">
+          <div className="grid items-center gap-6 md:grid-cols-2">
+            <div className="space-y-3">
+              <div className="h-7 w-3/4 rounded bg-gray-200" />
+              <div className="h-4 w-full rounded bg-gray-200" />
+              <div className="h-4 w-5/6 rounded bg-gray-200" />
+              <div className="mt-4 h-10 w-40 rounded-2xl bg-gray-300" />
+            </div>
+            <div className="h-40 rounded-2xl border border-gray-200 bg-white shadow-sm" />
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className={"relative overflow-hidden rounded-3xl border border-gray-200 bg-gradient-to-b from-white to-gray-50 shadow-sm " + className}>
@@ -171,28 +257,22 @@ export default function HeroBandit({ slug = "hero-tdah", onPrimary, className = 
       <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 md:py-14">
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="grid items-center gap-6 md:grid-cols-2">
           <div className="space-y-4">
-            {variant === "A" && (
-              <>
-                <h1 className="text-2xl font-semibold leading-tight text-gray-900 md:text-4xl">
-                  Test breve de TDAH, <span className="underline decoration-black/20">sin vueltas</span>
-                </h1>
-                <p className="text-gray-600">Screening inicial en 4–6 minutos. Obtén una indicación clara para decidir si vale la pena una evaluación completa.</p>
-              </>
-            )}
-            {variant === "B" && (
-              <>
-                <h1 className="text-2xl font-semibold leading-tight text-gray-900 md:text-4xl">
-                  ¿Dudas de TDAH? Empieza con un <span className="underline decoration-black/20">screening guiado</span>
-                </h1>
-                <p className="text-gray-600">Responde un cuestionario breve y recibe una orientación práctica para tu siguiente paso terapéutico.</p>
-              </>
-            )}
-            {variant === "control" && (
-              <>
-                <h1 className="text-2xl font-semibold leading-tight text-gray-900 md:text-4xl">Evalúa tus síntomas de TDAH de forma simple</h1>
-                <p className="text-gray-600">Un punto de partida rápido para entender mejor tus síntomas y qué hacer después.</p>
-              </>
-            )}
+            {variant === "A" && (<>
+              <h1 className="text-2xl font-semibold leading-tight text-gray-900 md:text-4xl">
+                Test breve de TDAH, <span className="underline decoration-black/20">sin vueltas</span>
+              </h1>
+              <p className="text-gray-600">Screening inicial en 4–6 minutos. Obtén una indicación clara para decidir si vale la pena una evaluación completa.</p>
+            </>)}
+            {variant === "B" && (<>
+              <h1 className="text-2xl font-semibold leading-tight text-gray-900 md:text-4xl">
+                ¿Dudas de TDAH? Empieza con un <span className="underline decoration-black/20">screening guiado</span>
+              </h1>
+              <p className="text-gray-600">Responde un cuestionario breve y recibe una orientación práctica para tu siguiente paso terapéutico.</p>
+            </>)}
+            {variant === "control" && (<>
+              <h1 className="text-2xl font-semibold leading-tight text-gray-900 md:text-4xl">Evalúa tus síntomas de TDAH de forma simple</h1>
+              <p className="text-gray-600">Un punto de partida rápido para entender mejor tus síntomas y qué hacer después.</p>
+            </>)}
 
             <ul className="mt-4 space-y-2 text-sm text-gray-700">
               <li className="flex items-center gap-2"><Check size={16} className="text-black" />Orientación clara al final del test</li>
