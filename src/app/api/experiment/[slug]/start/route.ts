@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
+import { getSupabaseAdmin } from "../../../../lib/supabaseAdmin";
 
 export const runtime = "nodejs";
 
@@ -26,7 +26,7 @@ export async function POST(
     });
   }
 
-  const { data, error } = await supabaseAdmin.rpc("rpc_start_visit", {
+  const { data, error } = await getSupabaseAdmin().rpc("rpc_start_visit", {
     p_slug: decodedSlug,
     p_anon_id: anon,
     p_variant_name: variant,

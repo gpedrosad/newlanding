@@ -1,6 +1,6 @@
 // src/app/api/experiment/[slug]/get-variant/route.ts
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
+import { getSupabaseAdmin } from "../../../../lib/supabaseAdmin";
 
 export const runtime = "nodejs";
 
@@ -43,7 +43,7 @@ export async function GET(
   // Solo A/B para este experimento
   const allowed: Variant[] = ["A", "B"];
 
-  const { data: exp } = await supabaseAdmin
+  const { data: exp } = await getSupabaseAdmin()
     .from("experiments")
     .select("id,is_active")
     .eq("slug", decodedSlug)
@@ -54,7 +54,7 @@ export async function GET(
     return NextResponse.json(payload);
   }
 
-  const { data: variants } = await supabaseAdmin
+  const { data: variants } = await getSupabaseAdmin()
     .from("experiment_variants")
     .select("id,name,alpha,beta")
     .eq("experiment_id", exp.id)

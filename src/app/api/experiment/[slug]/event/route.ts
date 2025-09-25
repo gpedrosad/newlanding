@@ -1,6 +1,6 @@
 // src/app/api/experiment/[slug]/event/route.ts
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
+import { getSupabaseAdmin } from "../../../../lib/supabaseAdmin";
 
 export const runtime = "nodejs";
 
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { error } = await supabaseAdmin.rpc("rpc_log_event", {
+  const { error } = await getSupabaseAdmin().rpc("rpc_log_event", {
     p_visit_id: body.visit_id,
     p_event_type: body.type,
   });

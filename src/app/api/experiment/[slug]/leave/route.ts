@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "../../../../lib/supabaseAdmin"; // NO lo importes en cliente
+import { getSupabaseAdmin } from "../../../../lib/supabaseAdmin"; // NO lo importes en cliente
 
 // Recomendado para usar service key
 export const runtime = "nodejs";
@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "visit_id requerido" }, { status: 400 });
   }
 
-  const { error } = await supabaseAdmin.rpc("rpc_leave_visit", { p_visit_id: visit_id });
+  const { error } = await getSupabaseAdmin().rpc("rpc_leave_visit", { p_visit_id: visit_id });
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   }

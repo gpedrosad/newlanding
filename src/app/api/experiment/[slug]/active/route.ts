@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "../../../../lib/supabaseAdmin"; // NO lo importes en cliente
+import { getSupabaseAdmin } from "../../../../lib/supabaseAdmin"; // NO lo importes en cliente
 
 export const runtime = "nodejs";
 
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   // clamp también del lado server (definitivo)
   const delta = Math.max(1, Math.min(Math.floor(deltaSec), 15));
 
-  const { error } = await supabaseAdmin.rpc("rpc_add_active", {
+  const { error } = await getSupabaseAdmin().rpc("rpc_add_active", {
     p_visit_id: visit_id,
     p_delta: delta,
   });
