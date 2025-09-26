@@ -70,7 +70,7 @@ export default function FormClient() {
             <div className="pl-3 text-gray-400"><User size={18} /></div>
             <input id="name" name="name" type="text" autoComplete="name"
               value={data.name} onChange={(e) => handleChange('name', e.target.value)}
-              className={inputClass} placeholder="Ej. Arantza Flores" aria-invalid={!!errors.name} />
+              className={inputClass} placeholder="Ej. Juan Gonzalez" aria-invalid={!!errors.name} />
           </div>
           {errors.name && <p className="text-sm text-rose-600">{errors.name}</p>}
         </div>

@@ -1,23 +1,33 @@
 // src/app/test/_components/HeroBandit.tsx  (SERVER COMPONENT)
-import { getAnonFromCookies, getHeroVariantForSSR } from '@/app/lib/ab';
-import HeroBanditClient from './HeroBanditClient';
+import { getAnonFromCookies, getHeroVariantForSSR } from "@/app/lib/ab";
+import CTAButton from "@/app/test/_components/CTAButtonBandit";
+import HeroBanditClient from "./HeroBanditClient"; // ⬅️ Import directo (sin dynamic)
 
-export default async function HeroBandit(props: { slug?: string; className?: string }) {
-  const slug = props.slug ?? 'hero-tdah';
-
-  const [{ variant, cookieKey, hadCookie }, anon] = await Promise.all([
-    getHeroVariantForSSR(slug),
-    getAnonFromCookies(),
-  ]);
+export default async function HeroBandit({
+  slug = "hero-tdah",
+  className = "",
+}: {
+  slug?: string;
+  className?: string;
+}) {
+  const { variant, cookieKey, hadCookie } = await getHeroVariantForSSR(slug);
+  const anon = await getAnonFromCookies();
 
   return (
     <HeroBanditClient
       initialVariant={variant}
       persistCookieKey={cookieKey}
-      shouldPersist={!hadCookie}     // si no había cookie, el cliente la guarda
+      shouldPersist={!hadCookie}
       anonFromCookie={anon ?? undefined}
       slug={slug}
-      className={props.className}
-    />
+      className={className}
+    >
+      {/* CTA sin flicker (experimento independiente 'cta-copy') */}
+      <CTAButton
+        slug="cta-copy"
+        className="inline-flex items-center justify-center rounded-2xl bg-black px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-neutral-900 disabled:opacity-50"
+        labels={{ A: "Comenzar evaluación", B: "Hacer test ahora", control: "Empezar ahora" }}
+      />
+    </HeroBanditClient>
   );
 }
