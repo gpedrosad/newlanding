@@ -46,7 +46,30 @@ export default function FormClient() {
     e.preventDefault();
     const v = validate(data);
     if (Object.keys(v).length) return setErrors(v);
+
     setSubmitting(true);
+
+    const payload = JSON.stringify({
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+      consent: data.consent,
+    });
+
+    // Fire-and-forget para no bloquear la navegación (mejor para ads/primera visita)
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon('/api/leads', new Blob([payload], { type: 'application/json' }));
+      router.push('/test/tdah?step=1');
+      return;
+    }
+
+    // Fallback si sendBeacon no está disponible
+    fetch('/api/leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+      keepalive: true,
+    }).catch(() => {});
     router.push('/test/tdah?step=1');
   }
 
@@ -68,9 +91,17 @@ export default function FormClient() {
           <label htmlFor="name" className="text-sm font-medium text-gray-800">Nombre y apellido</label>
           <div className={inputWrap(!!errors.name)}>
             <div className="pl-3 text-gray-400"><User size={18} /></div>
-            <input id="name" name="name" type="text" autoComplete="name"
-              value={data.name} onChange={(e) => handleChange('name', e.target.value)}
-              className={inputClass} placeholder="Ej. Juan Gonzalez" aria-invalid={!!errors.name} />
+            <input
+              id="name"
+              name="name"
+              type="text"
+              autoComplete="name"
+              value={data.name}
+              onChange={(e) => handleChange('name', e.target.value)}
+              className={inputClass}
+              placeholder="Ej. Juan Gonzalez"
+              aria-invalid={!!errors.name}
+            />
           </div>
           {errors.name && <p className="text-sm text-rose-600">{errors.name}</p>}
         </div>
@@ -79,9 +110,17 @@ export default function FormClient() {
           <label htmlFor="email" className="text-sm font-medium text-gray-800">Email</label>
           <div className={inputWrap(!!errors.email)}>
             <div className="pl-3 text-gray-400"><Mail size={18} /></div>
-            <input id="email" name="email" type="email" autoComplete="email"
-              value={data.email} onChange={(e) => handleChange('email', e.target.value)}
-              className={inputClass} placeholder="tu@correo.com" aria-invalid={!!errors.email} />
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              value={data.email}
+              onChange={(e) => handleChange('email', e.target.value)}
+              className={inputClass}
+              placeholder="tu@correo.com"
+              aria-invalid={!!errors.email}
+            />
           </div>
           {errors.email && <p className="text-sm text-rose-600">{errors.email}</p>}
         </div>
@@ -90,18 +129,32 @@ export default function FormClient() {
           <label htmlFor="phone" className="text-sm font-medium text-gray-800">Teléfono (WhatsApp)</label>
           <div className={inputWrap(!!errors.phone)}>
             <div className="pl-3 text-gray-400"><Phone size={18} /></div>
-            <input id="phone" name="phone" type="tel" autoComplete="tel" inputMode="tel"
-              value={data.phone} onChange={(e) => handleChange('phone', e.target.value)}
-              className={inputClass} placeholder="+56 9 1234 5678" aria-invalid={!!errors.phone} />
+            <input
+              id="phone"
+              name="phone"
+              type="tel"
+              autoComplete="tel"
+              inputMode="tel"
+              value={data.phone}
+              onChange={(e) => handleChange('phone', e.target.value)}
+              className={inputClass}
+              placeholder="+56 9 1234 5678"
+              aria-invalid={!!errors.phone}
+            />
           </div>
           <p className="text-xs text-gray-500">Usa tu número con código de país (ej. +56, +54).</p>
           {errors.phone && <p className="text-sm text-rose-600">{errors.phone}</p>}
         </div>
 
         <div className="flex items-start gap-3 rounded-xl bg-gray-50 p-4">
-          <input id="consent" name="consent" type="checkbox"
-            checked={data.consent} onChange={(e) => handleChange('consent', e.target.checked)}
-            className="mt-1 h-4 w-4 rounded border-gray-300 text-black focus:ring-black" />
+          <input
+            id="consent"
+            name="consent"
+            type="checkbox"
+            checked={data.consent}
+            onChange={(e) => handleChange('consent', e.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-gray-300 text-black focus:ring-black"
+          />
           <label htmlFor="consent" className="text-sm text-gray-700">
             Acepto la <a href="/privacidad" className="underline underline-offset-2">política de privacidad</a> y recibir información relacionada con mi test.
           </label>

@@ -15,7 +15,7 @@ export default function Page() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-12">
+      <main className="mx-auto max-w-4xl px-4 py-8 md:px-6 md:py-12 mb-10">
         <HeroBandit slug="hero-tdah" className="mb-8" />
         <FormClient />
       </main>

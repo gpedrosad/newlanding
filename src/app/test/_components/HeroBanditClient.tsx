@@ -32,7 +32,7 @@ export default function HeroBanditClient({
   const [variant] = React.useState<"A" | "B">(initialVariant);
   const [anon] = React.useState<string | undefined>(anonFromCookie);
   const [visitId, setVisitId] = React.useState<string | null>(null);
-  const [loading, setLoading] = React.useState(false);
+  const [, setLoading] = React.useState(false); // ← solo cambio: no usamos 'loading', mantenemos setLoading
   const startedRef = React.useRef(false);
 
   // Persist cookie de variante del HERO si no existía (solo cliente)
@@ -112,7 +112,7 @@ export default function HeroBanditClient({
         transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
       />
 
-      <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 md:py-14">
+      <div className="mx-auto max-w-4xl px-4 py:10 sm:px-6 md:py-14">
         <motion.div
           initial="hidden"
           animate="visible"
@@ -145,10 +145,11 @@ export default function HeroBanditClient({
                 ) : (
                   <>
                     <h1 className="text-2xl font-semibold leading-tight text-gray-900 md:text-4xl">
-                    ¿Conviene evaluar TDAH? Descúbrelo en 4min</h1>
+                      ¿Conviene evaluar TDAH? Descúbrelo en 4min
+                    </h1>
                     <p className="text-gray-600">
-                    Si te identificas con distracciones, olvidos o impulsividad, este cuestionario te da una
-                    orientación inicial sobre TDAH. 
+                      Si te identificas con distracciones, olvidos o impulsividad, este cuestionario te da una
+                      orientación inicial sobre TDAH. 
                     </p>
                   </>
                 )}
