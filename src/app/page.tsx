@@ -6,6 +6,7 @@ import FAQTerapia from "./components/FAQTerapia";
 import ProblemSection from "./components/ProblemSection"; 
 import TherapyCTA from "./components/TherapyCTA"; 
 import ServicioTerapia from "./components/ServicioTerapia";
+import PayButton from "./components/PayButton";
 
 
 
@@ -21,6 +22,7 @@ export default function Home() {
       <FAQTerapia />
       <ProblemSection />
       <TherapyCTA />
+      <PayButton amount={15000} />
 
     </div>
   );

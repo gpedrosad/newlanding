@@ -24,7 +24,7 @@ export default function CTAButtonClient({
   const [variant] = React.useState<"A" | "B">(initialVariant);
   const [visitId, setVisitId] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
-  const startedRef = React.useRef(false);
+  const startedRef = React.useRef<boolean>(false); // ✅ tipado explícito
 
   // Persistir cookie de variante si no existía
   React.useEffect(() => {
@@ -47,7 +47,8 @@ export default function CTAButtonClient({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ variant }),
         });
-        const json: StartVisitResponse = await res.json();
+        // ✅ evitar any del json()
+        const json = (await res.json()) as unknown as StartVisitResponse;
         if (!aborted && json?.visit_id) setVisitId(json.visit_id);
       } catch {}
     })();
