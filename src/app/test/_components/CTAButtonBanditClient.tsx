@@ -10,21 +10,37 @@ type Props = {
   shouldPersist: boolean;
   slug: string;
   className?: string;
-  labels?: Partial<Record<"A"|"B"|"control", string>>;
+  labels?: Partial<Record<"A" | "B" | "control", string>>;
   href?: string;
-  onClick?: () => void; // si el padre es Client, podrá pasar una función
+  onClick?: () => void;
 };
 
 type StartVisitResponse = { ok: boolean; visit_id?: string; error?: string };
 
+function isStartVisitResponse(x: unknown): x is StartVisitResponse {
+  if (typeof x !== "object" || x === null) return false;
+  const o = x as Record<string, unknown>;
+  const ok = typeof o.ok === "boolean";
+  const visitOk = o.visit_id === undefined || typeof o.visit_id === "string";
+  const errOk = o.error === undefined || typeof o.error === "string";
+  return ok && visitOk && errOk;
+}
+
 export default function CTAButtonClient({
-  initialVariant, persistCookieKey, shouldPersist, slug, className = "", labels, href, onClick
+  initialVariant,
+  persistCookieKey,
+  shouldPersist,
+  slug,
+  className = "",
+  labels,
+  href,
+  onClick,
 }: Props) {
   const router = useRouter();
   const [variant] = React.useState<"A" | "B">(initialVariant);
   const [visitId, setVisitId] = React.useState<string | null>(null);
-  const [loading, setLoading] = React.useState(false);
-  const startedRef = React.useRef<boolean>(false); // ✅ tipado explícito
+  const [loading, setLoading] = React.useState<boolean>(false);
+  const startedRef = React.useRef<boolean>(false);
 
   // Persistir cookie de variante si no existía
   React.useEffect(() => {
@@ -42,18 +58,27 @@ export default function CTAButtonClient({
 
     (async () => {
       try {
-        const res = await fetch(`/api/experiment/${encodeURIComponent(slug)}/start`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ variant }),
-        });
-        // ✅ evitar any del json()
-        const json = (await res.json()) as unknown as StartVisitResponse;
-        if (!aborted && json?.visit_id) setVisitId(json.visit_id);
-      } catch {}
+        const res = await fetch(
+          `/api/experiment/${encodeURIComponent(slug)}/start`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ variant }),
+          }
+        );
+
+        const raw: unknown = await res.json(); // ✅ sin any
+        if (!aborted && isStartVisitResponse(raw) && raw.visit_id) {
+          setVisitId(raw.visit_id);
+        }
+      } catch {
+        /* no-op */
+      }
     })();
 
-    return () => { aborted = true; };
+    return () => {
+      aborted = true;
+    };
   }, [slug, variant]);
 
   const textByVariant = {
@@ -68,11 +93,14 @@ export default function CTAButtonClient({
     try {
       setLoading(true);
       if (visitId) {
+        // No esperamos la respuesta; evitamos bloquear UI
         fetch(`/api/experiment/${encodeURIComponent(slug)}/event`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ visit_id: visitId, type: "cta_click" }),
-        }).catch(() => {});
+        }).catch(() => {
+          /* no-op */
+        });
       }
     } finally {
       setLoading(false);
