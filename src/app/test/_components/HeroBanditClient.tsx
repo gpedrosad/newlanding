@@ -17,7 +17,23 @@ type Props = {
 };
 
 type StartVisitResponse = { ok: boolean; visit_id?: string; error?: string };
-declare global { interface Window { __visit_id?: string } }
+
+// ✅ augment del window para evitar (window as any)
+declare global {
+  interface Window {
+    __visit_id?: string;
+  }
+}
+
+// ✅ type-guard para json()
+function isStartVisitResponse(x: unknown): x is StartVisitResponse {
+  if (typeof x !== "object" || x === null) return false;
+  const o = x as Record<string, unknown>;
+  const ok = typeof o.ok === "boolean";
+  const visitOk = o.visit_id === undefined || typeof o.visit_id === "string";
+  const errOk = o.error === undefined || typeof o.error === "string";
+  return ok && visitOk && errOk;
+}
 
 export default function HeroBanditClient({
   initialVariant,
@@ -32,8 +48,8 @@ export default function HeroBanditClient({
   const [variant] = React.useState<"A" | "B">(initialVariant);
   const [anon] = React.useState<string | undefined>(anonFromCookie);
   const [visitId, setVisitId] = React.useState<string | null>(null);
-  const [, setLoading] = React.useState(false); // no usamos 'loading', solo el setter
-  const startedRef = React.useRef(false);
+  const [, setLoading] = React.useState<boolean>(false); // no usamos 'loading', solo el setter
+  const startedRef = React.useRef<boolean>(false);
 
   // Persist cookie de variante del HERO si no existía (solo cliente)
   React.useEffect(() => {
@@ -56,15 +72,19 @@ export default function HeroBanditClient({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ variant }),
         });
-        const json: StartVisitResponse = await res.json();
-        if (!aborted && json?.visit_id) {
-          setVisitId(json.visit_id);
-          (window as any).__visit_id = json.visit_id;
+        const raw: unknown = await res.json(); // ✅ sin any
+        if (!aborted && isStartVisitResponse(raw) && raw.visit_id) {
+          setVisitId(raw.visit_id);
+          window.__visit_id = raw.visit_id; // ✅ sin any
         }
-      } catch { /* noop */ }
+      } catch {
+        /* noop */
+      }
     })();
 
-    return () => { aborted = true; };
+    return () => {
+      aborted = true;
+    };
   }, [variant, slug]);
 
   // Click primario del HERO (navegación/scroll + opcional conversión por anon)
