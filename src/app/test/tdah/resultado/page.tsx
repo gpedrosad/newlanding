@@ -1,3 +1,4 @@
+// src/app/test/result/page.tsx (o el archivo donde lo tengas)
 "use client";
 
 import React, { useMemo, Suspense } from "react";
@@ -65,7 +66,7 @@ function rangeLabel(total: number) {
   return { label: "Muy bajo", badge: "bg-gray-300 text-gray-900" };
 }
 
-/** Mapea el total (0–40) a una categoría de probabilidad de diagnóstico + texto guía */
+/** Mapea el total (0–40) a probabilidad + texto guía */
 function probabilityCategory(total: number) {
   if (total >= 35) {
     return {
@@ -74,7 +75,7 @@ function probabilityCategory(total: number) {
       text:
         "Tu patrón de respuestas sugiere una probabilidad muy alta de un cuadro compatible con TDAH. " +
         "Es muy recomendable realizar una evaluación clínica completa para confirmar el diagnóstico, " +
-        "explorar condiciones asociadas y diseñar un plan de tratamiento."
+        "explorar condiciones asociadas y diseñar un plan de tratamiento.",
     };
   }
   if (total >= 30) {
@@ -83,7 +84,7 @@ function probabilityCategory(total: number) {
       badge: "bg-gray-900 text-white",
       text:
         "Existe una probabilidad alta de TDAH. Te conviene agendar una evaluación integral para precisar el diagnóstico " +
-        "y definir estrategias de intervención personalizadas."
+        "y definir estrategias de intervención personalizadas.",
     };
   }
   if (total >= 20) {
@@ -92,7 +93,7 @@ function probabilityCategory(total: number) {
       badge: "bg-gray-700 text-white",
       text:
         "Tus respuestas indican probabilidad moderada. Puede haber manifestaciones de inatención y/o impulsividad. " +
-        "Una evaluación clínica ayudará a aclarar el cuadro y a priorizar medidas prácticas."
+        "Una evaluación clínica ayudará a aclarar el cuadro y a priorizar medidas prácticas.",
     };
   }
   if (total >= 10) {
@@ -101,7 +102,7 @@ function probabilityCategory(total: number) {
       badge: "bg-gray-500 text-white",
       text:
         "La probabilidad estimada es baja. Aun así, si notas impacto en estudio, trabajo o relaciones, " +
-        "una consulta profesional puede orientar estrategias de manejo."
+        "una consulta profesional puede orientar estrategias de manejo.",
     };
   }
   return {
@@ -109,8 +110,66 @@ function probabilityCategory(total: number) {
     badge: "bg-gray-300 text-gray-900",
     text:
       "La probabilidad estimada es muy baja. Si persisten dudas o hay dificultades significativas, " +
-      "una evaluación clínica puede descartar otras causas y brindar recomendaciones."
+      "una evaluación clínica puede descartar otras causas y brindar recomendaciones.",
   };
+}
+
+function actionCopy(probLabel: string) {
+  if (/(muy alta|alta)/i.test(probLabel)) {
+    return {
+      title: "Tu resultado sugiere avanzar con evaluación",
+      subtitle:
+        "Agenda el paquete de 3 sesiones para confirmar diagnóstico y definir un plan de intervención.",
+      cta: "Reservar evaluación",
+      alt: "Conocer el detalle",
+    };
+  }
+  if (/moderad/i.test(probLabel)) {
+    return {
+      title: "Recomendación: evaluación clínica inicial",
+      subtitle:
+        "Un proceso breve puede aclarar el cuadro y priorizar acciones concretas.",
+      cta: "Reservar evaluación",
+      alt: "Ver qué incluye",
+    };
+  }
+  return {
+    title: "Siguiente paso sugerido",
+    subtitle:
+      "Si tus síntomas afectan el día a día, una evaluación puede orientar estrategias de manejo.",
+    cta: "Hablar con un profesional",
+    alt: "Conocer la evaluación",
+  };
+}
+
+function recommendations(total: number) {
+  if (total >= 35)
+    return [
+      "Agendar la evaluación de 3 sesiones para confirmar diagnóstico.",
+      "Revisar historia de concentración, organización y regulación emocional.",
+      "Explorar comorbilidades frecuentes (ansiedad, ánimo, sueño).",
+    ];
+  if (total >= 30)
+    return [
+      "Reservar evaluación breve para precisar el diagnóstico.",
+      "Mapear situaciones de mayor impacto (estudio, trabajo, relaciones).",
+      "Definir medidas inmediatas: higiene del sueño, estructura, recordatorios.",
+    ];
+  if (total >= 20)
+    return [
+      "Solicitar una consulta de orientación clínica.",
+      "Registrar durante una semana momentos de distracción/impulsividad.",
+      "Probar herramientas básicas: listas, bloques de tiempo, alarmas.",
+    ];
+  if (total >= 10)
+    return [
+      "Monitorear síntomas 2–4 semanas con herramientas de organización.",
+      "Si persiste el impacto, coordinar una orientación clínica.",
+    ];
+  return [
+    "Mantener hábitos de sueño, ejercicio y organización.",
+    "Consultar si aparecen nuevas dificultades o dudas específicas.",
+  ];
 }
 
 const btnBlack =
@@ -127,7 +186,7 @@ function ResultInner() {
 
   const n = useMemo(() => {
     const v = Number(sp.get("n"));
-    return Number.isFinite(v) && v > 0 ? v : 0; // esperado: 10
+    return Number.isFinite(v) && v > 0 ? v : 0;
   }, [sp]);
 
   // Parser flexible: acepta total/avg/score
@@ -202,6 +261,8 @@ function ResultInner() {
   const { avg, total, pct } = parsed;
   const band = rangeLabel(total);
   const prob = probabilityCategory(total);
+  const recos = recommendations(total);
+  const copy = actionCopy(prob.label);
 
   // ---- Handlers para el componente de Evaluación ----
   const PRICE = 150_000;
@@ -215,11 +276,11 @@ function ResultInner() {
       n: String(n),
       prob: prob.label,
     }).toString();
-    router.push(`/agenda?${qp}`); // ajusta a tu ruta real
+    router.push(`/agenda?${qp}`);
   };
 
   const handleDetails = () => {
-    router.push("/servicios/evaluacion"); // ajusta a tu ruta real
+    router.push("/servicios/evaluacion");
   };
 
   return (
@@ -234,8 +295,39 @@ function ResultInner() {
           transition={{ duration: 0.28 }}
           className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6 md:p-10"
         >
-          {/* Resumen superior usando ScoreCard */}
-          <div className="grid gap-6 md:grid-cols-2 md:items-start">
+          {/* 1) INTENCIÓN PRIMERO: Callout + CTA */}
+          <section className="rounded-xl border border-gray-200 bg-gray-50 p-4 md:p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs ${prob.badge}`}>
+                {prob.label}
+              </span>
+              <span className="text-xs text-gray-500">Estimación orientativa (no diagnóstico)</span>
+            </div>
+            <h2 className="mt-2 text-lg font-semibold text-gray-900">{copy.title}</h2>
+            <p className="mt-1 text-sm text-gray-700">{copy.subtitle}</p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <button onClick={handleReserve} className={btnBlack}>{copy.cta}</button>
+              <button
+                onClick={handleDetails}
+                className="rounded-lg border border-gray-300 px-4 py-3 text-base sm:text-sm font-semibold text-gray-900 hover:bg-gray-50"
+              >
+                {copy.alt}
+              </button>
+            </div>
+          </section>
+
+          {/* 2) Oferta arriba */}
+          <div className="mt-8">
+            <ThreeSessionEvaluation
+              price={PRICE}
+              onReserve={handleReserve}
+              onDetails={handleDetails}
+              scoreContext={{ total, avg, n, probabilityLabel: prob.label }}
+            />
+          </div>
+
+          {/* 3) Detalle de resultados */}
+          <div className="mt-10 grid gap-6 md:grid-cols-2 md:items-start">
             <ScoreCard
               title={`Puntaje total (0–${n * 4})`}
               value={total.toFixed(0)}
@@ -251,7 +343,6 @@ function ResultInner() {
               badgeText={band.label}
               badgeClass={band.badge}
             >
-              {/* Guía debajo del segundo card */}
               <div className="rounded-lg border border-gray-200 p-3 text-sm text-gray-700">
                 <div className="mb-1 text-xs font-semibold text-gray-900">Guía de interpretación (total 0–40):</div>
                 <ul className="grid gap-1">
@@ -265,42 +356,31 @@ function ResultInner() {
             </ScoreCard>
           </div>
 
-          {/* Probabilidad de diagnóstico */}
-          <section className="mt-8 grid gap-3">
-            <h3 className="text-base font-semibold text-gray-900">Probabilidad de diagnóstico</h3>
-            <div className="flex flex-wrap items-center gap-3">
-              <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm ${prob.badge}`}>
-                {prob.label}
-              </span>
-              <span className="text-sm text-gray-500">
-                Estimación basada en tus respuestas (no constituye diagnóstico)
-              </span>
-            </div>
-            <p className="text-sm text-gray-700">{prob.text}</p>
+          {/* 4) Recomendaciones sin prueba social */}
+          <section className="mt-10">
+            <h3 className="text-base font-semibold text-gray-900">Recomendaciones</h3>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-700">
+              {recos.map((r, i) => (
+                <li key={i}>{r}</li>
+              ))}
+            </ul>
           </section>
 
-          {/* Evaluación 3 sesiones */}
-          <div className="mt-12 md:mt-16 pt-8 md:pt-10 border-t border-gray-200">
-            <ThreeSessionEvaluation
-              price={PRICE}
-              onReserve={handleReserve}
-              onDetails={handleDetails}
-              scoreContext={{
-                total,
-                avg,
-                n,
-                probabilityLabel: prob.label,
-              }}
-            />
-          </div>
-
           {/* Acciones base */}
-          <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-10 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
             <button onClick={handleRetake} className={btnBlack}>Rehacer test</button>
             <button onClick={handleShare} className={btnBlack}>Compartir resultado</button>
           </div>
         </motion.div>
       </main>
+
+      {/* CTA sticky (móvil) */}
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white/90 p-3 backdrop-blur supports-[backdrop-filter]:bg-white/60 sm:hidden">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
+          <span className="text-xs text-gray-600">{prob.label} · 3 sesiones</span>
+          <button onClick={handleReserve} className={btnBlack}>Reservar evaluación</button>
+        </div>
+      </div>
     </div>
   );
 }

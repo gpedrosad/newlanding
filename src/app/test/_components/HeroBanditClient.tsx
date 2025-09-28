@@ -32,7 +32,7 @@ export default function HeroBanditClient({
   const [variant] = React.useState<"A" | "B">(initialVariant);
   const [anon] = React.useState<string | undefined>(anonFromCookie);
   const [visitId, setVisitId] = React.useState<string | null>(null);
-  const [, setLoading] = React.useState(false); // ← solo cambio: no usamos 'loading', mantenemos setLoading
+  const [, setLoading] = React.useState(false); // no usamos 'loading', solo el setter
   const startedRef = React.useRef(false);
 
   // Persist cookie de variante del HERO si no existía (solo cliente)
@@ -59,7 +59,7 @@ export default function HeroBanditClient({
         const json: StartVisitResponse = await res.json();
         if (!aborted && json?.visit_id) {
           setVisitId(json.visit_id);
-          window.__visit_id = json.visit_id;
+          (window as any).__visit_id = json.visit_id;
         }
       } catch { /* noop */ }
     })();
@@ -91,7 +91,7 @@ export default function HeroBanditClient({
 
     const form = document.getElementById("form-start");
     if (form) form.scrollIntoView({ behavior: "smooth", block: "start" });
-    else router.push("/test/tdah?step=1");
+    else router.push("/test/depresion?step=1");
   };
 
   return (
@@ -112,7 +112,7 @@ export default function HeroBanditClient({
         transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
       />
 
-      <div className="mx-auto max-w-4xl px-4 py:10 sm:px-6 md:py-14">
+      <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 md:py-14">
         <motion.div
           initial="hidden"
           animate="visible"
@@ -135,21 +135,21 @@ export default function HeroBanditClient({
                 {variant === "A" ? (
                   <>
                     <h1 className="text-2xl font-semibold leading-tight text-gray-900 md:text-4xl">
-                      Test breve de TDAH, <span className="underline decoration-black/20">sin vueltas</span>
+                      Test breve de depresión, <span className="underline decoration-black/20">sin vueltas</span>
                     </h1>
                     <p className="text-gray-600">
                       Cuestionario inicial en 4–6 minutos. Obtén una indicación clara para decidir si vale la pena una
-                      evaluación completa.
+                      evaluación clínica completa.
                     </p>
                   </>
                 ) : (
                   <>
                     <h1 className="text-2xl font-semibold leading-tight text-gray-900 md:text-4xl">
-                      ¿Conviene evaluar TDAH? Descúbrelo en 4min
+                      ¿Conviene evaluar depresión? Descúbrelo en pocos minutos
                     </h1>
                     <p className="text-gray-600">
-                      Si te identificas con distracciones, olvidos o impulsividad, este cuestionario te da una
-                      orientación inicial sobre TDAH. 
+                      Si notas ánimo bajo, falta de energía o pérdida de interés, este cuestionario te da una
+                      orientación inicial y sugiere el siguiente paso.
                     </p>
                   </>
                 )}
@@ -162,7 +162,7 @@ export default function HeroBanditClient({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25, ease: "easeOut", delay: 0.05 }}
             >
-              <li className="flex items-center gap-2"><Check size={16} className="text-black" />Orientación clara al final del test</li>
+              <li className="flex items-center gap-2"><Check size={16} className="text-black" />Orientación clara al final</li>
               <li className="flex items-center gap-2"><Shield size={16} className="text-black" />Datos privados y seguros</li>
               <li className="flex items-center gap-2"><Clock size={16} className="text-black" />4–6 minutos aprox.</li>
             </motion.ul>
@@ -173,7 +173,7 @@ export default function HeroBanditClient({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25, ease: "easeOut", delay: 0.1 }}
             >
-              {/* ⬇️ Envolvemos el CTA para que este componente maneje la navegación/scroll sin romper el logging del CTA */}
+              {/* Envolvemos el CTA para que este componente maneje la navegación/scroll sin romper el logging del CTA */}
               <div onClick={handlePrimary}>
                 {children}
               </div>
