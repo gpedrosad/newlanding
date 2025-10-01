@@ -1,17 +1,65 @@
 "use client";
+
 import React from "react";
 import Image from "next/image";
 import { AiFillStar, AiOutlineStar, AiOutlineCheckCircle } from "react-icons/ai";
 import Reviews from "../components/Reviews";
 
-type Dias =
-  | "Lunes"
-  | "Martes"
-  | "Miércoles"
-  | "Jueves"
-  | "Viernes"
-  | "Sábado"
-  | "Domingo";
+// ─────────────────────────────────────────────────────────────────────────────
+// Facebook Pixel: tipado y helper, igual que /suscribirse
+// ─────────────────────────────────────────────────────────────────────────────
+type FBQ = (event: "track" | "trackCustom" | string, ...args: unknown[]) => void;
+const fbq: FBQ | undefined = (globalThis as unknown as { fbq?: FBQ }).fbq;
+
+// Helper para generar eventID y reutilizarlo con CAPI (server dedup)
+const makeEventId = (prefix: string) =>
+  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+// Captura UTM y cookies _fbc/_fbp (idéntico enfoque a /suscribirse)
+function collectMeta(base: Record<string, string> = {}) {
+  const meta: Record<string, string> = { ...base };
+  try {
+    const usp = new URLSearchParams(window.location.search);
+    const utmKeys = [
+      "utm_source",
+      "utm_medium",
+      "utm_campaign",
+      "utm_term",
+      "utm_content",
+      "gclid",
+      "fbclid",
+    ];
+    utmKeys.forEach((k) => {
+      const v = usp.get(k);
+      if (v) meta[k] = v;
+    });
+
+    const cs = document.cookie || "";
+    const fbc = /(?:^|;\s*)_fbc=([^;]+)/.exec(cs)?.[1];
+    const fbp = /(?:^|;\s*)_fbp=([^;]+)/.exec(cs)?.[1];
+    if (fbc) meta.fbc = fbc;
+    if (fbp) meta.fbp = fbp;
+  } catch {
+    /* no-op */
+  }
+  return meta;
+}
+
+// (Opcional) beacon para loguear click/lead en tu backend antes del redirect
+function sendLeadBeacon(url: string, payload: unknown) {
+  try {
+    const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+    navigator.sendBeacon(url, blob);
+  } catch {
+    /* no-op */
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tipos y datos
+// ─────────────────────────────────────────────────────────────────────────────
+
+type Dias = "Lunes" | "Martes" | "Miércoles" | "Jueves" | "Viernes" | "Sábado" | "Domingo";
 type HorariosSeleccionados = Record<Dias, string[]>;
 
 interface ProfileData {
@@ -20,33 +68,29 @@ interface ProfileData {
   professionalDescription: string | null;
   specializations: string[] | null;
   photo: string | null;
-  services: Array<{
-    id: string;
-    name: string;
-    price_ars: number | null;
-    duration: number | null;
-    selected_slots: HorariosSeleccionados | null;
-  }> | null;
+  services:
+    | Array<{
+        id: string;
+        name: string;
+        price_ars: number | null; // ⚠️ Mantengo el nombre original, pero abajo configuro la moneda visible
+        duration: number | null;
+        selected_slots: HorariosSeleccionados | null;
+      }>
+    | null;
   professional_id: string | null;
 }
 
-declare global {
-  interface Window {
-    fbq?: (command: string, eventName: string, params?: object) => void;
-  }
-}
-
 const Profile: React.FC = () => {
-  // Mover los datos estáticos fuera del componente
   const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
 
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return null; // o return un componente de carga
-  }
+  // ── Config de moneda visible / de evento ───────────────────────────────────
+  // El UI muestra "CLP" aunque la propiedad se llama price_ars.
+  // Si en tu caso es ARS, cambia `currency` a "ARS" y el locale a "es-AR".
+  const currency = "CLP" as const;
+  const moneyLocale = currency === "CLP" ? "es-CL" : "es-AR";
+  const formatMoney = (n: number | null | undefined) =>
+    typeof n === "number" ? n.toLocaleString(moneyLocale) : "-";
 
   // Datos hardcodeados para el perfil
   const profileData: ProfileData = {
@@ -55,7 +99,7 @@ const Profile: React.FC = () => {
     professionalDescription:
       "Con más de 7 años de experiencia ayudando a pacientes a encontrar el equilibrio emocional, ofrezco un enfoque integrador basado en evidencia y técnicas modernas de psicoterapia.",
     specializations: ["Terapia Cognitiva", "Mindfulness", "Depresión", "Ansiedad", "Estrés", "Autoestima"],
-    photo: "/yo.png", // Asegúrate de tener esta imagen o ajusta la ruta
+    photo: "/yo.png",
     services: [
       {
         id: "service2",
@@ -76,34 +120,89 @@ const Profile: React.FC = () => {
     professional_id: "prof123",
   };
 
-  // Datos de reseñas hardcodeados
+  const primaryService = profileData.services?.[0];
+
   const averageRating = 4.8;
   const reviewCount = 281;
   const isRatingLoading = false;
 
-  // Función auxiliar para renderizar estrellas según la puntuación
+  // ── ViewContent al cargar la página de perfil ──────────────────────────────
+  React.useEffect(() => {
+    if (!mounted) return;
+    const vcEventId = makeEventId("vc-profile");
+    try {
+      fbq?.(
+        "track",
+        "ViewContent",
+        {
+          content_name: profileData.name || "Profile",
+          content_category: "professional_profile",
+          content_ids: primaryService?.id ? [primaryService.id] : undefined,
+          content_type: "service",
+          value: primaryService?.price_ars ?? 0,
+          currency,
+        },
+        { eventID: vcEventId }
+      );
+    } catch {
+      /* no-op */
+    }
+  }, [mounted, currency, primaryService?.id, primaryService?.price_ars, profileData.name]);
+
   const renderStars = (rating: number) => {
     const roundedRating = Math.round(rating);
     return (
       <div className="flex text-[#FFB703]">
         {Array.from({ length: 5 }, (_, i) =>
-          i < roundedRating ? (
-            <AiFillStar key={i} size={30} />
-          ) : (
-            <AiOutlineStar key={i} size={30} />
-          )
+          i < roundedRating ? <AiFillStar key={i} size={30} /> : <AiOutlineStar key={i} size={30} />
         )}
       </div>
     );
   };
 
-  // Función para manejar el click en "Agendar cita"
-  const handleAgendarClick = () => {
-    // Disparar evento en Facebook Pixel
-    if (window.fbq) {
-      window.fbq("track", "AgendamientoWhatsapp");
+  // Traquea de dónde viene el clic: "inline" (card) o "sticky" (barra inferior mobile)
+  const handleAgendarClick = (source: "inline" | "sticky" = "inline") => {
+    const price = primaryService?.price_ars ?? 0;
+
+    // 1) Pixel — InitiateCheckout (previo al redirect)
+    let icEventId: string | undefined;
+    try {
+      icEventId = makeEventId("ic-profile");
+      fbq?.(
+        "track",
+        "InitiateCheckout",
+        {
+          value: price,
+          currency,
+          // opcional: enriquecer el contenido
+          content_ids: primaryService?.id ? [primaryService.id] : undefined,
+          content_type: "service",
+        },
+        { eventID: icEventId }
+      );
+    } catch {
+      /* no-op */
     }
-    // Redireccionar a la URL de WhatsApp
+
+    // 2) (Opcional) Notificar a tu backend por beacon para guardar lead/analytics
+    try {
+      const payload = {
+        t: Date.now(),
+        action: "click_agendar_whatsapp",
+        source,
+        currency,
+        price,
+        professional_id: profileData.professional_id,
+        service_id: primaryService?.id,
+        event_id: icEventId, // ← para deduplicar en CAPI si lo usás server-side
+        meta: collectMeta({ page: "profile" }),
+      };
+      sendLeadBeacon("/api/trackProfileClick", payload);
+    } catch {
+      /* no-op */
+    }
+
+    // 3) Redirige a WhatsApp (cambiá por tu link)
     window.location.href = "https://walink.co/6626d8";
   };
 
@@ -127,28 +226,22 @@ const Profile: React.FC = () => {
             className="rounded-lg mb-4 object-cover"
           />
           <h2 className="text-2xl md:text-4xl font-bold">{profileData.name}</h2>
-          <p className="text-gray-500 text-xl md:text-2xl">
-            {profileData.profession}
-          </p>
+          <p className="text-gray-500 text-xl md:text-2xl">{profileData.profession}</p>
 
           {/* Puntaje promedio */}
           <div className="flex flex-col items-center mt-4 space-y-1">
             {isRatingLoading ? (
-              <div className="w-24 h-6 bg-gray-300 animate-pulse rounded"></div>
+              <div className="w-24 h-6 bg-gray-300 animate-pulse rounded" />
             ) : (
               <div className="flex items-center space-x-2">
-                <p className="text-gray-800 text-2xl md:text-3xl font-semibold">
-                  {averageRating.toFixed(1)}
-                </p>
+                <p className="text-gray-800 text-2xl md:text-3xl font-semibold">{averageRating.toFixed(1)}</p>
                 {renderStars(averageRating)}
               </div>
             )}
             {isRatingLoading ? (
-              <div className="w-32 h-4 bg-gray-300 animate-pulse rounded mt-2"></div>
+              <div className="w-32 h-4 bg-gray-300 animate-pulse rounded mt-2" />
             ) : (
-              <p className="text-gray-500 text-md md:text-lg">
-                ({reviewCount} evaluaciones)
-              </p>
+              <p className="text-gray-500 text-md md:text-lg">({reviewCount} evaluaciones)</p>
             )}
           </div>
         </div>
@@ -162,17 +255,12 @@ const Profile: React.FC = () => {
 
         <div className="mt-12">
           <h3 className="text-2xl md:text-3xl font-semibold mb-6">Sobre mi</h3>
-          <p className="text-gray-700 text-lg">
-            {profileData.professionalDescription ||
-              "No hay descripción disponible."}
-          </p>
+          <p className="text-gray-700 text-lg">{profileData.professionalDescription || "No hay descripción disponible."}</p>
         </div>
 
         <div className="mt-12">
           <hr className="my-6 border-gray-300" />
-          <h3 className="text-xl md:text-3xl font-semibold mb-4 text-left">
-            Me especializo en:
-          </h3>
+          <h3 className="text-xl md:text-3xl font-semibold mb-4 text-left">Me especializo en:</h3>
           <div className="flex flex-wrap gap-3 justify-center">
             {profileData.specializations ? (
               profileData.specializations.map((specialization, index) => (
@@ -191,9 +279,7 @@ const Profile: React.FC = () => {
         </div>
 
         <div className="mt-12">
-          <h3 className="text-2xl md:text-3xl font-semibold mb-6">
-            Servicios ofrecidos
-          </h3>
+          <h3 className="text-2xl md:text-3xl font-semibold mb-6">Servicios ofrecidos</h3>
           {profileData.services ? (
             profileData.services.map((service) => (
               <div
@@ -202,7 +288,7 @@ const Profile: React.FC = () => {
               >
                 <div className="flex flex-col space-y-4">
                   <h4 className="text-xl font-bold text-[#023047]">{service.name}</h4>
-                  
+
                   <div className="flex flex-row justify-between items-center bg-gray-50 p-3 rounded-lg">
                     <div className="flex items-center">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -210,21 +296,23 @@ const Profile: React.FC = () => {
                       </svg>
                       <span className="font-medium">{service.duration} minutos</span>
                     </div>
-                    
+
                     <div className="flex items-center">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       <span className="font-bold text-lg text-[#023047]">
-                        {service.price_ars?.toLocaleString()} CLP
+                        {formatMoney(service.price_ars)} {currency}
                       </span>
                     </div>
                   </div>
-                  
+
+                  {/* Botón dentro de la card: visible también en mobile */}
                   <button
                     type="button"
-                    onClick={handleAgendarClick}
-                    className="w-full bg-[#023047] text-white font-semibold py-3 px-4 rounded-lg hover:bg-[#03506f] active:transform active:scale-98 transition-all duration-200 flex justify-center items-center space-x-2"
+                    onClick={() => handleAgendarClick("inline")}
+                    className="flex w-full bg-[#023047] text-white font-semibold py-3 px-4 rounded-lg hover:bg-[#03506f] active:scale-95 transition-all duration-200 justify-center items-center space-x-2"
+                    data-cta="agendar-inline"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -239,14 +327,43 @@ const Profile: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Espaciador para que el contenido no quede oculto por la barra sticky en mobile */}
+      <div className="h-24 md:hidden" aria-hidden />
+
       <Reviews />
 
       <hr className="w-full border-gray-300 mt-12 mb-8" />
 
-      {/* Footer hardcodeado */}
+      {/* Footer */}
       <div className="w-full bg-white p-6 text-center text-gray-600">
         <p>© 2025 Ansiosamente. Todos los derechos reservados.</p>
       </div>
+
+      {/* STICKY MOBILE CTA */}
+      {primaryService && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white/95 backdrop-blur">
+          <div className="mx-auto max-w-xl flex items-center gap-3 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+            <div className="flex flex-col">
+              <span className="text-xs text-gray-500">{primaryService.name}</span>
+              <span className="text-base font-semibold text-[#023047]">
+                {formatMoney(primaryService.price_ars)} {currency}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleAgendarClick("sticky")}
+              className="ml-auto inline-flex items-center justify-center rounded-xl bg-[#023047] text-white px-5 py-3 font-semibold shadow-sm hover:bg-[#03506f] active:scale-95 transition"
+              data-cta="agendar-sticky"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Agendar sesión
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
