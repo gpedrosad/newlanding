@@ -6,59 +6,47 @@ import { AiFillStar, AiOutlineStar, AiOutlineCheckCircle } from "react-icons/ai"
 import Reviews from "../components/Reviews";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Facebook Pixel: tipado y helper, igual que /suscribirse
+// Facebook Pixel (solo front) — ¡NO congelar fbq!
 // ─────────────────────────────────────────────────────────────────────────────
 type FBQ = (event: "track" | "trackCustom" | string, ...args: unknown[]) => void;
-const fbq: FBQ | undefined = (globalThis as unknown as { fbq?: FBQ }).fbq;
+const getFbq = () => (globalThis as unknown as { fbq?: FBQ }).fbq; // ← getter dinámico
 
-// Helper para generar eventID y reutilizarlo con CAPI (server dedup)
 const makeEventId = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
-// Captura UTM y cookies _fbc/_fbp (idéntico enfoque a /suscribirse)
-function collectMeta(base: Record<string, string> = {}) {
-  const meta: Record<string, string> = { ...base };
-  try {
-    const usp = new URLSearchParams(window.location.search);
-    const utmKeys = [
-      "utm_source",
-      "utm_medium",
-      "utm_campaign",
-      "utm_term",
-      "utm_content",
-      "gclid",
-      "fbclid",
-    ];
-    utmKeys.forEach((k) => {
-      const v = usp.get(k);
-      if (v) meta[k] = v;
-    });
-
-    const cs = document.cookie || "";
-    const fbc = /(?:^|;\s*)_fbc=([^;]+)/.exec(cs)?.[1];
-    const fbp = /(?:^|;\s*)_fbp=([^;]+)/.exec(cs)?.[1];
-    if (fbc) meta.fbc = fbc;
-    if (fbp) meta.fbp = fbp;
-  } catch {
-    /* no-op */
-  }
-  return meta;
-}
-
-// (Opcional) beacon para loguear click/lead en tu backend antes del redirect
-function sendLeadBeacon(url: string, payload: unknown) {
-  try {
-    const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
-    navigator.sendBeacon(url, blob);
-  } catch {
-    /* no-op */
-  }
+function trackWithRetry(
+  eventName: "ViewContent" | "InitiateCheckout" | string,
+  params: Record<string, unknown>,
+  eventId?: string,
+  retries = 25,
+  intervalMs = 200
+) {
+  let attempts = 0;
+  const trySend = () => {
+    attempts++;
+    const f = getFbq();
+    const ready = typeof f === "function";
+    if (ready) {
+      try {
+        eventId ? f!("track", eventName, params, { eventID: eventId }) : f!("track", eventName, params);
+        console.log(`[Pixel] ${eventName} enviado`, { params, eventId });
+      } catch (e) {
+        console.warn(`[Pixel] Error enviando ${eventName}`, e);
+      }
+      return;
+    }
+    if (attempts < retries) {
+      setTimeout(trySend, intervalMs);
+    } else {
+      console.warn(`[Pixel] fbq no disponible tras ${retries} intentos (${eventName})`);
+    }
+  };
+  trySend();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos y datos
 // ─────────────────────────────────────────────────────────────────────────────
-
 type Dias = "Lunes" | "Martes" | "Miércoles" | "Jueves" | "Viernes" | "Sábado" | "Domingo";
 type HorariosSeleccionados = Record<Dias, string[]>;
 
@@ -72,7 +60,7 @@ interface ProfileData {
     | Array<{
         id: string;
         name: string;
-        price_ars: number | null; // ⚠️ Mantengo el nombre original, pero abajo configuro la moneda visible
+        price_ars: number | null;
         duration: number | null;
         selected_slots: HorariosSeleccionados | null;
       }>
@@ -84,15 +72,13 @@ const Profile: React.FC = () => {
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
 
-  // ── Config de moneda visible / de evento ───────────────────────────────────
-  // El UI muestra "CLP" aunque la propiedad se llama price_ars.
-  // Si en tu caso es ARS, cambia `currency` a "ARS" y el locale a "es-AR".
-  const currency = "CLP" as const;
+  // Moneda visible/evento (ajusta si corresponde)
+  const currency = "CLP" as const; // cambia a "ARS" si querés alinear con price_ars
   const moneyLocale = currency === "CLP" ? "es-CL" : "es-AR";
   const formatMoney = (n: number | null | undefined) =>
     typeof n === "number" ? n.toLocaleString(moneyLocale) : "-";
 
-  // Datos hardcodeados para el perfil
+  // Datos de ejemplo
   const profileData: ProfileData = {
     name: "Gonzalo Pedrosa",
     profession: "Psicólogo Clínico",
@@ -121,32 +107,26 @@ const Profile: React.FC = () => {
   };
 
   const primaryService = profileData.services?.[0];
-
   const averageRating = 4.8;
   const reviewCount = 281;
   const isRatingLoading = false;
 
-  // ── ViewContent al cargar la página de perfil ──────────────────────────────
+  // ViewContent al montar (con retry)
   React.useEffect(() => {
     if (!mounted) return;
     const vcEventId = makeEventId("vc-profile");
-    try {
-      fbq?.(
-        "track",
-        "ViewContent",
-        {
-          content_name: profileData.name || "Profile",
-          content_category: "professional_profile",
-          content_ids: primaryService?.id ? [primaryService.id] : undefined,
-          content_type: "service",
-          value: primaryService?.price_ars ?? 0,
-          currency,
-        },
-        { eventID: vcEventId }
-      );
-    } catch {
-      /* no-op */
-    }
+    trackWithRetry(
+      "ViewContent",
+      {
+        content_name: profileData.name || "Profile",
+        content_category: "professional_profile",
+        content_ids: primaryService?.id ? [primaryService.id] : undefined,
+        content_type: "service",
+        value: primaryService?.price_ars ?? 0,
+        currency,
+      },
+      vcEventId
+    );
   }, [mounted, currency, primaryService?.id, primaryService?.price_ars, profileData.name]);
 
   const renderStars = (rating: number) => {
@@ -160,50 +140,29 @@ const Profile: React.FC = () => {
     );
   };
 
-  // Traquea de dónde viene el clic: "inline" (card) o "sticky" (barra inferior mobile)
+  // Clic en CTA -> InitiateCheckout (sin redirección, solo evento + log)
   const handleAgendarClick = (source: "inline" | "sticky" = "inline") => {
     const price = primaryService?.price_ars ?? 0;
+    const icEventId = makeEventId("ic-profile");
 
-    // 1) Pixel — InitiateCheckout (previo al redirect)
-    let icEventId: string | undefined;
-    try {
-      icEventId = makeEventId("ic-profile");
-      fbq?.(
-        "track",
-        "InitiateCheckout",
-        {
-          value: price,
-          currency,
-          // opcional: enriquecer el contenido
-          content_ids: primaryService?.id ? [primaryService.id] : undefined,
-          content_type: "service",
-        },
-        { eventID: icEventId }
-      );
-    } catch {
-      /* no-op */
-    }
-
-    // 2) (Opcional) Notificar a tu backend por beacon para guardar lead/analytics
-    try {
-      const payload = {
-        t: Date.now(),
-        action: "click_agendar_whatsapp",
-        source,
+    trackWithRetry(
+      "InitiateCheckout",
+      {
+        value: price,
         currency,
-        price,
-        professional_id: profileData.professional_id,
-        service_id: primaryService?.id,
-        event_id: icEventId, // ← para deduplicar en CAPI si lo usás server-side
-        meta: collectMeta({ page: "profile" }),
-      };
-      sendLeadBeacon("/api/trackProfileClick", payload);
-    } catch {
-      /* no-op */
-    }
+        content_ids: primaryService?.id ? [primaryService.id] : undefined,
+        content_type: "service",
+        source, // para depurar
+      },
+      icEventId
+    );
 
-    // 3) Redirige a WhatsApp (cambiá por tu link)
-    window.location.href = "https://walink.co/6626d8";
+    console.log("[Profile] InitiateCheckout fired (solo front, sin redirect)", {
+      source,
+      price,
+      currency,
+      event_id: icEventId,
+    });
   };
 
   return (
@@ -307,11 +266,11 @@ const Profile: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Botón dentro de la card: visible también en mobile */}
+                  {/* CTA dentro de la card */}
                   <button
                     type="button"
                     onClick={() => handleAgendarClick("inline")}
-                    className="flex w-full bg-[#023047] text-white font-semibold py-3 px-4 rounded-lg hover:bg-[#03506f] active:scale-95 transition-all duration-200 justify-center items-center space-x-2"
+                    className="flex w-full bg-[#023047] text-white font-semibold py-3 px-4 rounded-lg hover:bg-[#03506f] active:scale-95 transition-all duración-200 justify-center items-center space-x-2"
                     data-cta="agendar-inline"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
