@@ -7,7 +7,12 @@ import { AiFillStar, AiOutlineStar, AiOutlineCheckCircle } from "react-icons/ai"
 import Reviews from "../components/Reviews";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Facebook Pixel (front) + envío por API (CAPI)
+// Config de Test Events (CAPI)
+// ─────────────────────────────────────────────────────────────────────────────
+// ⚠️ Para DEJAR de usar Test Events, poné USE_TEST = false
+const USE_TEST = true;
+const TEST_EVENT_CODE = "TEST36133";
+
 // ─────────────────────────────────────────────────────────────────────────────
 type FBQ = (event: "track" | "trackCustom" | string, ...args: unknown[]) => void;
 const getFbq = () => (globalThis as unknown as { fbq?: FBQ }).fbq; // getter dinámico (no “congelar” fbq)
@@ -89,6 +94,7 @@ async function sendInitiateCheckoutToAPI(payload: {
   content_type?: string;
   source?: string;
   meta?: Record<string, string>;
+  test_event_code?: string; // ← soporta Test Events
 }) {
   try {
     await fetch("/api/meta/track", {
@@ -104,6 +110,7 @@ async function sendInitiateCheckoutToAPI(payload: {
         content_type: payload.content_type,
         source: payload.source,
         meta: payload.meta,
+        test_event_code: payload.test_event_code, // ← se envía al back
         client_ts: Date.now(),
       }),
     });
@@ -227,7 +234,7 @@ const Profile: React.FC = () => {
       icEventId
     );
 
-    // 2) API (CAPI)
+    // 2) API (CAPI) — con Test Events hardcodeado mientras USE_TEST sea true
     const meta = collectAttribution({ page: "profile", source });
     void sendInitiateCheckoutToAPI({
       event_id: icEventId,
@@ -237,6 +244,7 @@ const Profile: React.FC = () => {
       content_type: "service",
       source,
       meta,
+      test_event_code: USE_TEST ? TEST_EVENT_CODE : undefined,
     });
 
     // 3) Log local (dev)
@@ -245,6 +253,7 @@ const Profile: React.FC = () => {
       price,
       currency,
       event_id: icEventId,
+      test_event_code: USE_TEST ? TEST_EVENT_CODE : undefined,
     });
   };
 
@@ -270,7 +279,7 @@ const Profile: React.FC = () => {
           <h2 className="text-2xl md:text-4xl font-bold">{profileData.name}</h2>
           <p className="text-gray-500 text-xl md:text-2xl">{profileData.profession}</p>
 
-        {/* Puntaje promedio */}
+          {/* Puntaje promedio */}
           <div className="flex flex-col items-center mt-4 space-y-1">
             {isRatingLoading ? (
               <div className="w-24 h-6 bg-gray-300 animate-pulse rounded" />
