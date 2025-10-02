@@ -1,3 +1,4 @@
+// app/perfil/page.tsx
 "use client";
 
 import React from "react";
@@ -6,14 +7,15 @@ import { AiFillStar, AiOutlineStar, AiOutlineCheckCircle } from "react-icons/ai"
 import Reviews from "../components/Reviews";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Facebook Pixel (solo front) — ¡NO congelar fbq!
+// Facebook Pixel (front) + envío por API (CAPI)
 // ─────────────────────────────────────────────────────────────────────────────
 type FBQ = (event: "track" | "trackCustom" | string, ...args: unknown[]) => void;
-const getFbq = () => (globalThis as unknown as { fbq?: FBQ }).fbq; // ← getter dinámico
+const getFbq = () => (globalThis as unknown as { fbq?: FBQ }).fbq; // getter dinámico (no “congelar” fbq)
 
 const makeEventId = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
+// Reintenta enviar al Pixel si fbq aún no está listo (sin ternarios como statement)
 function trackWithRetry(
   eventName: "ViewContent" | "InitiateCheckout" | string,
   params: Record<string, unknown>,
@@ -25,10 +27,13 @@ function trackWithRetry(
   const trySend = () => {
     attempts++;
     const f = getFbq();
-    const ready = typeof f === "function";
-    if (ready) {
+    if (typeof f === "function") {
       try {
-        eventId ? f!("track", eventName, params, { eventID: eventId }) : f!("track", eventName, params);
+        if (eventId) {
+          f("track", eventName, params, { eventID: eventId });
+        } else {
+          f("track", eventName, params);
+        }
         console.log(`[Pixel] ${eventName} enviado`, { params, eventId });
       } catch (e) {
         console.warn(`[Pixel] Error enviando ${eventName}`, e);
@@ -42,6 +47,70 @@ function trackWithRetry(
     }
   };
   trySend();
+}
+
+// Atribución básica para CAPI: UTM + cookies _fbc/_fbp + url/referrer
+function collectAttribution(base: Record<string, string> = {}) {
+  const meta: Record<string, string> = { ...base };
+  try {
+    const usp = new URLSearchParams(window.location.search);
+    for (const k of [
+      "utm_source",
+      "utm_medium",
+      "utm_campaign",
+      "utm_term",
+      "utm_content",
+      "gclid",
+      "fbclid",
+    ]) {
+      const v = usp.get(k);
+      if (v) meta[k] = v;
+    }
+    const cs = document.cookie || "";
+    const fbc = /(?:^|;\s*)_fbc=([^;]+)/.exec(cs)?.[1];
+    const fbp = /(?:^|;\s*)_fbp=([^;]+)/.exec(cs)?.[1];
+    if (fbc) meta.fbc = fbc;
+    if (fbp) meta.fbp = fbp;
+
+    meta.url = window.location.href;
+    if (document.referrer) meta.referrer = document.referrer;
+  } catch {
+    /* no-op */
+  }
+  return meta;
+}
+
+// Envío por API a tu backend (Conversions API). Usa keepalive para no bloquear si luego rediriges.
+async function sendInitiateCheckoutToAPI(payload: {
+  event_id: string;
+  value: number;
+  currency: string;
+  content_ids?: string[];
+  content_type?: string;
+  source?: string;
+  meta?: Record<string, string>;
+}) {
+  try {
+    await fetch("/api/meta/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      keepalive: true,
+      body: JSON.stringify({
+        event_name: "InitiateCheckout",
+        event_id: payload.event_id,
+        value: payload.value,
+        currency: payload.currency,
+        content_ids: payload.content_ids,
+        content_type: payload.content_type,
+        source: payload.source,
+        meta: payload.meta,
+        client_ts: Date.now(),
+      }),
+    });
+    console.log("[API] InitiateCheckout enviado a /api/meta/track");
+  } catch (e) {
+    console.warn("[API] Error enviando InitiateCheckout", e);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -73,7 +142,7 @@ const Profile: React.FC = () => {
   React.useEffect(() => setMounted(true), []);
 
   // Moneda visible/evento (ajusta si corresponde)
-  const currency = "CLP" as const; // cambia a "ARS" si querés alinear con price_ars
+  const currency = "CLP" as const; // cambia a "ARS" si quieres alinear con price_ars
   const moneyLocale = currency === "CLP" ? "es-CL" : "es-AR";
   const formatMoney = (n: number | null | undefined) =>
     typeof n === "number" ? n.toLocaleString(moneyLocale) : "-";
@@ -111,7 +180,7 @@ const Profile: React.FC = () => {
   const reviewCount = 281;
   const isRatingLoading = false;
 
-  // ViewContent al montar (con retry)
+  // ViewContent al montar (Pixel front)
   React.useEffect(() => {
     if (!mounted) return;
     const vcEventId = makeEventId("vc-profile");
@@ -140,11 +209,12 @@ const Profile: React.FC = () => {
     );
   };
 
-  // Clic en CTA -> InitiateCheckout (sin redirección, solo evento + log)
+  // Clic en CTA -> InitiateCheckout (Pixel + API). Sin redirección.
   const handleAgendarClick = (source: "inline" | "sticky" = "inline") => {
     const price = primaryService?.price_ars ?? 0;
     const icEventId = makeEventId("ic-profile");
 
+    // 1) Pixel (front)
     trackWithRetry(
       "InitiateCheckout",
       {
@@ -152,12 +222,25 @@ const Profile: React.FC = () => {
         currency,
         content_ids: primaryService?.id ? [primaryService.id] : undefined,
         content_type: "service",
-        source, // para depurar
+        source,
       },
       icEventId
     );
 
-    console.log("[Profile] InitiateCheckout fired (solo front, sin redirect)", {
+    // 2) API (CAPI)
+    const meta = collectAttribution({ page: "profile", source });
+    void sendInitiateCheckoutToAPI({
+      event_id: icEventId,
+      value: price,
+      currency,
+      content_ids: primaryService?.id ? [primaryService.id] : undefined,
+      content_type: "service",
+      source,
+      meta,
+    });
+
+    // 3) Log local (dev)
+    console.log("[Profile] InitiateCheckout (Pixel + API)", {
       source,
       price,
       currency,
@@ -187,7 +270,7 @@ const Profile: React.FC = () => {
           <h2 className="text-2xl md:text-4xl font-bold">{profileData.name}</h2>
           <p className="text-gray-500 text-xl md:text-2xl">{profileData.profession}</p>
 
-          {/* Puntaje promedio */}
+        {/* Puntaje promedio */}
           <div className="flex flex-col items-center mt-4 space-y-1">
             {isRatingLoading ? (
               <div className="w-24 h-6 bg-gray-300 animate-pulse rounded" />
@@ -270,7 +353,7 @@ const Profile: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleAgendarClick("inline")}
-                    className="flex w-full bg-[#023047] text-white font-semibold py-3 px-4 rounded-lg hover:bg-[#03506f] active:scale-95 transition-all duración-200 justify-center items-center space-x-2"
+                    className="flex w-full bg-[#023047] text-white font-semibold py-3 px-4 rounded-lg hover:bg-[#03506f] active:scale-95 transition-all duration-200 justify-center items-center space-x-2"
                     data-cta="agendar-inline"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
