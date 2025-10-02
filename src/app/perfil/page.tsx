@@ -1,4 +1,3 @@
-// app/perfil/page.tsx
 "use client";
 
 import React from "react";
@@ -7,20 +6,19 @@ import { AiFillStar, AiOutlineStar, AiOutlineCheckCircle } from "react-icons/ai"
 import Reviews from "../components/Reviews";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Config de Test Events (CAPI)
-// ─────────────────────────────────────────────────────────────────────────────
-// ⚠️ Para DEJAR de usar Test Events, poné USE_TEST = false
-const USE_TEST = true;
-const TEST_EVENT_CODE = "TEST36133";
-
+// Facebook Pixel (front) + envío por API (CAPI)
 // ─────────────────────────────────────────────────────────────────────────────
 type FBQ = (event: "track" | "trackCustom" | string, ...args: unknown[]) => void;
-const getFbq = () => (globalThis as unknown as { fbq?: FBQ }).fbq; // getter dinámico (no “congelar” fbq)
+const getFbq = () => (globalThis as unknown as { fbq?: FBQ }).fbq; // getter dinámico
 
 const makeEventId = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
-// Reintenta enviar al Pixel si fbq aún no está listo (sin ternarios como statement)
+// ⚠️ TEST EVENTS: hardcode para probar en Events Manager → Test Events
+//    Para DESACTIVAR, cambia a: const FRONT_TEST_EVENT_CODE: string | undefined = undefined;
+const FRONT_TEST_EVENT_CODE: string | undefined = "TEST36133";
+
+// Reintenta enviar al Pixel si fbq aún no está listo
 function trackWithRetry(
   eventName: "ViewContent" | "InitiateCheckout" | string,
   params: Record<string, unknown>,
@@ -54,7 +52,7 @@ function trackWithRetry(
   trySend();
 }
 
-// Atribución básica para CAPI: UTM + cookies _fbc/_fbp + url/referrer
+// Atribución básica para CAPI
 function collectAttribution(base: Record<string, string> = {}) {
   const meta: Record<string, string> = { ...base };
   try {
@@ -85,7 +83,7 @@ function collectAttribution(base: Record<string, string> = {}) {
   return meta;
 }
 
-// Envío por API a tu backend (Conversions API). Usa keepalive para no bloquear si luego rediriges.
+// Envío por API a tu backend (Conversions API)
 async function sendInitiateCheckoutToAPI(payload: {
   event_id: string;
   value: number;
@@ -94,10 +92,10 @@ async function sendInitiateCheckoutToAPI(payload: {
   content_type?: string;
   source?: string;
   meta?: Record<string, string>;
-  test_event_code?: string; // ← soporta Test Events
+  test_event_code?: string;
 }) {
   try {
-    await fetch("/api/meta/track", {
+    const res = await fetch("/api/meta/track", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       keepalive: true,
@@ -110,11 +108,18 @@ async function sendInitiateCheckoutToAPI(payload: {
         content_type: payload.content_type,
         source: payload.source,
         meta: payload.meta,
-        test_event_code: payload.test_event_code, // ← se envía al back
         client_ts: Date.now(),
+        // ← se envía al backend para que pegue a Graph en modo "Test Events"
+        test_event_code: payload.test_event_code,
       }),
     });
-    console.log("[API] InitiateCheckout enviado a /api/meta/track");
+
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      console.warn("[API] /api/meta/track respondió error", j);
+    } else {
+      console.log("[API] InitiateCheckout enviado a /api/meta/track", j);
+    }
   } catch (e) {
     console.warn("[API] Error enviando InitiateCheckout", e);
   }
@@ -148,13 +153,11 @@ const Profile: React.FC = () => {
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
 
-  // Moneda visible/evento (ajusta si corresponde)
-  const currency = "CLP" as const; // cambia a "ARS" si quieres alinear con price_ars
+  const currency = "CLP" as const; // cambia a "ARS" si corresponde
   const moneyLocale = currency === "CLP" ? "es-CL" : "es-AR";
   const formatMoney = (n: number | null | undefined) =>
     typeof n === "number" ? n.toLocaleString(moneyLocale) : "-";
 
-  // Datos de ejemplo
   const profileData: ProfileData = {
     name: "Gonzalo Pedrosa",
     profession: "Psicólogo Clínico",
@@ -234,7 +237,7 @@ const Profile: React.FC = () => {
       icEventId
     );
 
-    // 2) API (CAPI) — con Test Events hardcodeado mientras USE_TEST sea true
+    // 2) API (CAPI) — con test_event_code si está definido
     const meta = collectAttribution({ page: "profile", source });
     void sendInitiateCheckoutToAPI({
       event_id: icEventId,
@@ -244,23 +247,21 @@ const Profile: React.FC = () => {
       content_type: "service",
       source,
       meta,
-      test_event_code: USE_TEST ? TEST_EVENT_CODE : undefined,
+      test_event_code: FRONT_TEST_EVENT_CODE,
     });
 
-    // 3) Log local (dev)
     console.log("[Profile] InitiateCheckout (Pixel + API)", {
       source,
       price,
       currency,
       event_id: icEventId,
-      test_event_code: USE_TEST ? TEST_EVENT_CODE : undefined,
+      test_event_code: FRONT_TEST_EVENT_CODE,
     });
   };
 
   return (
     <div className="flex flex-col items-center h-full w-full">
       <div className="w-full bg-white rounded-lg shadow-lg p-10 md:p-16">
-        {/* Label de Profesional Recomendado */}
         <div className="mb-4">
           <span className="inline-block bg-green-500 text-white text-sm font-medium px-3 py-1 rounded-full">
             Profesional Recomendado
@@ -279,7 +280,6 @@ const Profile: React.FC = () => {
           <h2 className="text-2xl md:text-4xl font-bold">{profileData.name}</h2>
           <p className="text-gray-500 text-xl md:text-2xl">{profileData.profession}</p>
 
-          {/* Puntaje promedio */}
           <div className="flex flex-col items-center mt-4 space-y-1">
             {isRatingLoading ? (
               <div className="w-24 h-6 bg-gray-300 animate-pulse rounded" />
@@ -315,10 +315,7 @@ const Profile: React.FC = () => {
           <div className="flex flex-wrap gap-3 justify-center">
             {profileData.specializations ? (
               profileData.specializations.map((specialization, index) => (
-                <span
-                  key={index}
-                  className="bg-[#023047] text-white text-sm md:text-xl font-medium px-3 py-1 rounded-full"
-                >
+                <span key={index} className="bg-[#023047] text-white text-sm md:text-xl font-medium px-3 py-1 rounded-full">
                   {specialization}
                 </span>
               ))
@@ -358,7 +355,6 @@ const Profile: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* CTA dentro de la card */}
                   <button
                     type="button"
                     onClick={() => handleAgendarClick("inline")}
@@ -379,19 +375,16 @@ const Profile: React.FC = () => {
         </div>
       </div>
 
-      {/* Espaciador para que el contenido no quede oculto por la barra sticky en mobile */}
       <div className="h-24 md:hidden" aria-hidden />
 
       <Reviews />
 
       <hr className="w-full border-gray-300 mt-12 mb-8" />
 
-      {/* Footer */}
       <div className="w-full bg-white p-6 text-center text-gray-600">
         <p>© 2025 Ansiosamente. Todos los derechos reservados.</p>
       </div>
 
-      {/* STICKY MOBILE CTA */}
       {primaryService && (
         <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white/95 backdrop-blur">
           <div className="mx-auto max-w-xl flex items-center gap-3 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">

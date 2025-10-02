@@ -1,4 +1,3 @@
-// app/api/meta/track/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 
@@ -6,42 +5,48 @@ import crypto from "crypto";
 export const runtime = "nodejs";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ENV requeridas
+// ENV requeridas (compat nombres)
 // ─────────────────────────────────────────────────────────────────────────────
-const PIXEL_ID = process.env.META_PIXEL_ID;
-const ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
-const GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v18.0";
-const TEST_EVENT_CODE = process.env.META_TEST_EVENT_CODE; // opcional (Test Events)
+const PIXEL_ID =
+  process.env.META_PIXEL_ID || process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID || "";
+const ACCESS_TOKEN =
+  process.env.META_ACCESS_TOKEN || process.env.FACEBOOK_ACCESS_TOKEN || "";
+const GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v19.0";
+
+// ⚠️ TEST EVENTS (server-side):
+//    • Para usar test: deja el valor "TEST36133" o pon META_TEST_EVENT_CODE en Vercel.
+//    • Para DESACTIVAR test events: cambia a undefined y quita META_TEST_EVENT_CODE.
+const FORCE_TEST_EVENT_CODE: string | undefined =
+  "TEST36133"; // ← quitar o poner undefined para producción
+const TEST_EVENT_CODE = FORCE_TEST_EVENT_CODE || process.env.META_TEST_EVENT_CODE;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos
 // ─────────────────────────────────────────────────────────────────────────────
-type CurrencyISO = string; // p.ej., "CLP" | "ARS" | "USD"
+type CurrencyISO = string;
 
 interface FrontMeta {
   url?: string;
   referrer?: string;
   fbc?: string;
   fbp?: string;
-  // Permitimos UTM y otros string arbitrarios
   [k: string]: string | undefined;
 }
 
 interface FrontBody {
-  event_name?: string;                 // por defecto "InitiateCheckout"
-  event_id?: string;                   // para deduplicación
+  event_name?: string;
+  event_id?: string;
   value?: number;
   currency?: CurrencyISO;
   content_ids?: string[];
   content_type?: string;
-  source?: string;                     // etiqueta propia (inline, sticky, etc.)
-  meta?: FrontMeta;                    // { url, referrer, utms..., fbc, fbp }
-  client_ts?: number;                  // timestamp del cliente (ms)
-  // PII opcional (se hachea aquí ANTES de enviar a Meta)
+  source?: string;
+  meta?: FrontMeta;
+  client_ts?: number;
   email?: string;
   phone?: string;
   external_id?: string;
-  test_event_code?: string;            // opcional para Test Events
+  test_event_code?: string;
 }
 
 interface UserData {
@@ -49,9 +54,9 @@ interface UserData {
   client_ip_address?: string;
   fbc?: string;
   fbp?: string;
-  em?: string[];        // emails hasheados
-  ph?: string[];        // teléfonos hasheados (solo dígitos)
-  external_id?: string; // id externo hasheado
+  em?: string[];
+  ph?: string[];
+  external_id?: string;
 }
 
 interface CustomData {
@@ -63,7 +68,7 @@ interface CustomData {
 
 interface GraphEvent {
   event_name: string;
-  event_time: number; // unix seconds
+  event_time: number;
   event_id?: string;
   action_source: "website";
   event_source_url?: string;
@@ -144,8 +149,12 @@ function toFrontBody(raw: unknown): FrontBody {
 export async function POST(req: NextRequest) {
   try {
     if (!PIXEL_ID || !ACCESS_TOKEN) {
+      console.error("[meta/track] Missing envs", {
+        have_PIXEL_ID: Boolean(PIXEL_ID),
+        have_ACCESS_TOKEN: Boolean(ACCESS_TOKEN),
+      });
       return NextResponse.json(
-        { ok: false, error: "Faltan META_PIXEL_ID o META_ACCESS_TOKEN" },
+        { ok: false, error: "Faltan variables: PIXEL_ID o ACCESS_TOKEN" },
         { status: 500 }
       );
     }
@@ -176,7 +185,12 @@ export async function POST(req: NextRequest) {
     // custom_data
     const custom_data: CustomData = {
       currency: body.currency,
-      value: typeof body.value === "number" ? body.value : Number.isFinite(body.value) ? Number(body.value) : undefined,
+      value:
+        typeof body.value === "number"
+          ? body.value
+          : Number.isFinite(body.value as unknown as number)
+          ? Number(body.value)
+          : undefined,
       content_ids: body.content_ids,
       content_type: body.content_type,
     };
@@ -195,7 +209,6 @@ export async function POST(req: NextRequest) {
 
     const payload: GraphPayload = {
       data: [graphEvent],
-      // test_event_code es opcional
       ...(body.test_event_code
         ? { test_event_code: body.test_event_code }
         : TEST_EVENT_CODE
@@ -214,6 +227,14 @@ export async function POST(req: NextRequest) {
     const fbJson = (await fbRes.json()) as GraphResponse;
     const ok = fbRes.ok && (fbJson.events_received ?? 0) >= 1;
 
+    if (!ok) {
+      console.error("[meta/track] Graph error", {
+        status: fbRes.status,
+        fb: fbJson,
+        payload,
+      });
+    }
+
     return NextResponse.json(
       {
         ok,
@@ -230,6 +251,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Error desconocido";
+    console.error("[meta/track] exception", message);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
